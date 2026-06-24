@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // Relative paths cho GitHub Pages
+  base: '/Silence_Production/', // Absolute path cho GitHub Pages (tên repository)
   server: {
     proxy: {
       // Proxy Nhanh.vn API để tránh CORS khi development
