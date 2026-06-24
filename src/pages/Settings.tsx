@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
 import {
   Wifi, WifiOff, Shield, Download, Upload, Trash2, CheckCircle, AlertCircle,
-  RefreshCw, Clock, ExternalLink
+  RefreshCw, Clock, ExternalLink, Link, Loader
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
@@ -15,12 +15,99 @@ export const Settings: React.FC = () => {
   const [appId, setAppId] = useState(localStorage.getItem('silence_nhanh_app_id') || '');
   const [businessId, setBusinessId] = useState(localStorage.getItem('silence_nhanh_business_id') || '');
   const [accessToken, setAccessToken] = useState(localStorage.getItem('silence_nhanh_access_token') || '');
+  const [secretKey, setSecretKey] = useState(localStorage.getItem('silence_nhanh_secret_key') || '');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [importResult, setImportResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [oauthStatus, setOauthStatus] = useState<{ type: 'info' | 'success' | 'error'; msg: string } | null>(null);
+  const [isExchanging, setIsExchanging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Trao đổi OAuth code lấy Access Token
+  const exchangeCodeForToken = async (code: string) => {
+    setIsExchanging(true);
+    setOauthStatus({ type: 'info', msg: 'Đang đổi OAuth code lấy Access Token...' });
+
+    const savedAppId = localStorage.getItem('silence_nhanh_app_id') || appId.trim();
+    const savedSecretKey = localStorage.getItem('silence_nhanh_secret_key') || secretKey.trim();
+    const redirectUri = `${window.location.origin}${window.location.pathname}`;
+
+    if (!savedAppId || !savedSecretKey) {
+      setOauthStatus({
+        type: 'error',
+        msg: 'Thiếu App ID hoặc Secret Key. Hãy điền vào form rồi bấm Lưu trước khi kết nối.',
+      });
+      setIsExchanging(false);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('version', '3.0');
+      formData.append('appId', savedAppId);
+      formData.append('secretKey', savedSecretKey);
+      formData.append('code', code);
+      formData.append('grantType', 'authorization_code');
+      formData.append('redirectUri', redirectUri);
+
+      const response = await fetch('https://nhanh.vn/oauth/token', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      const token = data?.data?.accessToken || data?.accessToken || data?.access_token || data?.data?.access_token;
+
+      if (token) {
+        setAccessToken(token);
+        localStorage.setItem('silence_nhanh_access_token', token);
+        setOauthStatus({ type: 'success', msg: '✅ Lấy Access Token thành công! Đã lưu vào hệ thống.' });
+      } else {
+        throw new Error(data?.messages?.[0] || JSON.stringify(data));
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const isCorS = errMsg.includes('fetch') || errMsg.includes('CORS') || errMsg.includes('network');
+      setOauthStatus({
+        type: 'error',
+        msg: isCorS
+          ? `Không thể tự động lấy token do giới hạn CORS. Hãy dùng Postman/curl để đổi code: "${code}"`
+          : `Lỗi: ${errMsg}`,
+      });
+    } finally {
+      setIsExchanging(false);
+    }
+  };
+
+  // Phát hiện OAuth code sau khi redirect từ Nhanh.vn
+  useEffect(() => {
+    const code = localStorage.getItem('silence_nhanh_oauth_code');
+    if (code) {
+      localStorage.removeItem('silence_nhanh_oauth_code');
+      exchangeCodeForToken(code);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mở trang OAuth Nhanh.vn
+  const handleNhanhConnect = () => {
+    const id = appId.trim();
+    if (!id) {
+      setOauthStatus({ type: 'error', msg: 'Vui lòng nhập App ID trước.' });
+      return;
+    }
+    // Lưu App ID và Secret Key
+    localStorage.setItem('silence_nhanh_app_id', id);
+    if (secretKey.trim()) localStorage.setItem('silence_nhanh_secret_key', secretKey.trim());
+    if (businessId.trim()) localStorage.setItem('silence_nhanh_business_id', businessId.trim());
+
+    const redirectUri = encodeURIComponent(`${window.location.origin}${window.location.pathname}`);
+    const scopes = encodeURIComponent('viewOrder,updateInventory,updateProduct,viewProduct');
+    const oauthUrl = `https://nhanh.vn/oauth?version=3.0&appId=${id}&redirectUri=${redirectUri}&responseType=code&scopes=${scopes}`;
+    window.location.href = oauthUrl;
+  };
 
   // Lưu credentials
   const handleSaveCredentials = () => {
@@ -203,6 +290,19 @@ export const Settings: React.FC = () => {
               <div className="form-group">
                 <label>
                   <Shield size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                  Secret Key
+                </label>
+                <input
+                  type="password"
+                  placeholder="Secret key từ open.nhanh.vn"
+                  value={secretKey}
+                  onChange={(e) => setSecretKey(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>
+                  <Shield size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                   Access Token
                 </label>
                 <input
@@ -212,6 +312,40 @@ export const Settings: React.FC = () => {
                   onChange={(e) => setAccessToken(e.target.value)}
                 />
               </div>
+
+              {/* OAuth Connect Button */}
+              <button
+                onClick={handleNhanhConnect}
+                disabled={isExchanging}
+                className="btn btn-secondary"
+                style={{ width: '100%', gap: '8px', borderColor: '#006c49', color: '#006c49' }}
+              >
+                {isExchanging
+                  ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /><span>Đang lấy token...</span></>
+                  : <><Link size={14} /><span>Kết nối Nhanh.vn (OAuth)</span></>}
+              </button>
+
+              {/* OAuth Status */}
+              {oauthStatus && (
+                <div style={{
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  backgroundColor: oauthStatus.type === 'success' ? '#e6f6ef' : oauthStatus.type === 'error' ? '#ffdad6' : '#e8f0fe',
+                  color: oauthStatus.type === 'success' ? '#006c49' : oauthStatus.type === 'error' ? '#ba1a1a' : '#1a56db',
+                  border: `1px solid ${oauthStatus.type === 'success' ? '#c8f5e2' : oauthStatus.type === 'error' ? '#fecaca' : '#bfdbfe'}`,
+                  wordBreak: 'break-word' as const,
+                }}>
+                  {oauthStatus.type === 'success' ? <CheckCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} /> :
+                   oauthStatus.type === 'error' ? <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} /> :
+                   <RefreshCw size={14} style={{ flexShrink: 0, marginTop: 1 }} />}
+                  <span>{oauthStatus.msg}</span>
+                </div>
+              )}
 
               {saveSuccess && (
                 <div style={styles.successAlert}>

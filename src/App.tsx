@@ -18,7 +18,7 @@ const MainAppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { clearData } = useApp();
 
-  // Load user from localStorage on mount
+  // Load user from localStorage on mount + detect Nhanh.vn OAuth callback
   useEffect(() => {
     const savedUser = localStorage.getItem('silence_user');
     if (savedUser) {
@@ -28,6 +28,17 @@ const MainAppContent: React.FC = () => {
         console.error('Failed to parse saved user:', e);
         localStorage.removeItem('silence_user');
       }
+    }
+
+    // Phát hiện OAuth callback từ Nhanh.vn (?code=XXXX trong URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthCode = urlParams.get('code');
+    if (oauthCode) {
+      localStorage.setItem('silence_nhanh_oauth_code', oauthCode);
+      // Xóa code khỏi URL (bảo mật)
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Tự động chuyển đến trang Cài đặt để hoàn tất lấy token
+      setCurrentPage('settings');
     }
   }, []);
 
