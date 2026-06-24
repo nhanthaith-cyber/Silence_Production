@@ -19,8 +19,9 @@ Tài liệu này xác định chi tiết các yêu cầu chức năng và phi ch
   - **Tổng chi phí (Total Cost):** Bằng `Chi phí sản xuất` (số lượng bán * chi phí định mức SKU) + `Chi phí vận hành` (chi phí nhập ngoài).
   - **Lợi nhuận ròng (Net Profit):** Bằng `Doanh thu` - `Tổng chi phí`.
   - **Tỷ suất lợi nhuận (Profit Margin):** Bằng `(Lợi nhuận ròng / Doanh thu) * 100%`.
-- **Biểu đồ trực quan:**
-  - Biểu đồ cột chồng hoặc đường xu hướng so sánh Doanh thu, Chi phí và Lợi nhuận ròng qua các ngày/tháng.
+- **Báo cáo Lãi lỗ tổng hợp (P&L) và Thanh biểu đồ cơ cấu tài chính:**
+  - Bảng số liệu kết quả hoạt động kinh doanh (P&L) tổng hợp chi tiết phân rã Doanh thu theo nguồn và Chi phí theo phân loại nhóm vận hành.
+  - Thanh biểu đồ phân bổ tỉ trọng cơ cấu Doanh thu và Chi phí trực quan.
 - **Tiến độ sản xuất tóm tắt:**
   - Danh sách các lô sản xuất đang chạy và tỷ lệ hoàn thành (%).
 - **Lịch sử hoạt động:**
