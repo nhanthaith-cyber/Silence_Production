@@ -30,23 +30,25 @@ export const Dashboard: React.FC = () => {
   // 6. Margin
   const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-  // 7. Calculate stats by product for chart
-  const productStats = products.map((prod) => {
-    const prodSales = sales.filter((s) => s.productSku === prod.sku);
-    const revenue = prodSales.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
-    const cogs = prodSales.reduce((sum, s) => sum + s.quantity * prod.defaultCost, 0);
-    const profit = revenue - cogs;
-    const qtySold = prodSales.reduce((sum, s) => sum + s.quantity, 0);
+  // 7. Calculate breakdown by revenue source
+  const revenueBySource = {
+    shopee: sales.filter(s => s.source === 'shopee').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    tiktok: sales.filter(s => s.source === 'tiktok').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    offline: sales.filter(s => s.source === 'offline').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    manual: sales.filter(s => s.source === 'manual').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    nhanh_vn: sales.filter(s => s.source === 'nhanh_vn').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+  };
 
-    return {
-      sku: prod.sku,
-      name: prod.name,
-      revenue,
-      cogs,
-      profit,
-      qtySold,
-    };
-  });
+  // 8. Calculate breakdown by cost category
+  const costByCategory = {
+    production: totalCOGS,
+    labor: expenses.filter(e => e.category === 'labor').reduce((sum, e) => sum + e.amount, 0),
+    rent: expenses.filter(e => e.category === 'rent').reduce((sum, e) => sum + e.amount, 0),
+    ads: expenses.filter(e => e.category === 'ads').reduce((sum, e) => sum + e.amount, 0),
+    shipping: expenses.filter(e => e.category === 'shipping').reduce((sum, e) => sum + e.amount, 0),
+    material: expenses.filter(e => e.category === 'material').reduce((sum, e) => sum + e.amount, 0),
+    other: expenses.filter(e => e.category === 'other').reduce((sum, e) => sum + e.amount, 0),
+  };
 
   // 8. Production stages distribution
   const stageNames: Record<string, string> = {
@@ -127,73 +129,250 @@ export const Dashboard: React.FC = () => {
 
       {/* Core Panels Grid */}
       <div style={styles.dashboardGrid}>
-        {/* Left Side: Chart */}
-        <div className="card" style={{ flex: 2, minWidth: '320px' }}>
+        {/* Left Side: P&L Report & Breakdown */}
+        <div className="card" style={{ flex: 2, minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="card-header">
-            <h3>Hiệu quả tài chính theo sản phẩm</h3>
+            <h3>Lãi lỗ hiện tại tổng (P&L)</h3>
             <span style={{ fontSize: '12px', color: '#8191a9', fontWeight: 600 }}>Đơn vị: VND</span>
           </div>
 
-          <div style={styles.chartWrapper}>
-            {productStats.length === 0 ? (
-              <div style={styles.emptyState}>Chưa có sản phẩm nào trong hệ thống!</div>
-            ) : (
-              <div style={styles.chartContainer}>
-                {productStats.map((stat) => {
-                  const maxVal = Math.max(...productStats.map(s => Math.max(s.revenue, s.cogs, s.profit)), 100000);
-                  const revHeight = (stat.revenue / maxVal) * 100;
-                  const cogsHeight = (stat.cogs / maxVal) * 100;
-                  const profitHeight = (Math.max(0, stat.profit) / maxVal) * 100;
-
-                  return (
-                    <div key={stat.sku} style={styles.chartBarGroup}>
-                      <div style={styles.barVisualsContainer}>
-                        {/* Revenue Bar (Navy) */}
-                        <div style={styles.barWrapper}>
-                          <div style={{ ...styles.bar, height: `${revHeight}%`, backgroundColor: '#091426' }} title={`Doanh thu: ${formatCurrency(stat.revenue)}`}>
-                            {stat.revenue > 0 && <span style={styles.barLabel}>{formatCurrency(stat.revenue)}</span>}
-                          </div>
-                        </div>
-
-                        {/* Cost Bar (Red) */}
-                        <div style={styles.barWrapper}>
-                          <div style={{ ...styles.bar, height: `${cogsHeight}%`, backgroundColor: '#ba1a1a' }} title={`Giá vốn SX: ${formatCurrency(stat.cogs)}`}>
-                            {stat.cogs > 0 && <span style={styles.barLabel}>{formatCurrency(stat.cogs)}</span>}
-                          </div>
-                        </div>
-
-                        {/* Profit Bar (Sage Green) */}
-                        <div style={styles.barWrapper}>
-                          <div style={{ ...styles.bar, height: `${profitHeight}%`, backgroundColor: '#006c49' }} title={`Lợi nhuận gộp: ${formatCurrency(stat.profit)}`}>
-                            {stat.profit > 0 && <span style={styles.barLabel}>{formatCurrency(stat.profit)}</span>}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={styles.barGroupInfo}>
-                        <span style={styles.barProductSKU} className="mono">{stat.sku}</span>
-                        <span style={styles.barProductName} title={stat.name}>{stat.name}</span>
-                        <span style={styles.barProductSold} className="mono">Đã bán: {stat.qtySold} SP</span>
-                      </div>
-                    </div>
-                  );
-                })}
+          <div style={styles.plContainer}>
+            {/* Left: Table */}
+            <div style={styles.plTable}>
+              <div style={styles.plSectionHeader}>I. TỔNG DOANH THU</div>
+              <div style={styles.plTotalRow}>
+                <span>Tổng cộng doanh thu</span>
+                <span className="mono font-semibold" style={{ color: '#091426' }}>{formatCurrency(totalRevenue)}</span>
               </div>
-            )}
-          </div>
+              <div style={styles.plRow}>
+                <span>• Kênh Shopee</span>
+                <span className="mono">{formatCurrency(revenueBySource.shopee)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Kênh TikTok</span>
+                <span className="mono">{formatCurrency(revenueBySource.tiktok)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Offline (Lên ngoài)</span>
+                <span className="mono">{formatCurrency(revenueBySource.offline)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Đồng bộ Nhanh.vn</span>
+                <span className="mono">{formatCurrency(revenueBySource.nhanh_vn)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Nhập thủ công</span>
+                <span className="mono">{formatCurrency(revenueBySource.manual)}</span>
+              </div>
 
-          <div style={styles.chartLegend}>
-            <div style={styles.legendItem}>
-              <span style={{ ...styles.legendDot, backgroundColor: '#091426' }}></span>
-              <span>Doanh thu</span>
+              <div style={{ ...styles.plSectionHeader, marginTop: '16px' }}>II. TỔNG CHI PHÍ</div>
+              <div style={styles.plTotalRow}>
+                <span>Tổng cộng chi phí</span>
+                <span className="mono font-semibold" style={{ color: '#ba1a1a' }}>{formatCurrency(totalCost)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Giá vốn sản xuất (COGS)</span>
+                <span className="mono">{formatCurrency(costByCategory.production)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Chi phí nhân công</span>
+                <span className="mono">{formatCurrency(costByCategory.labor)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Chi phí mặt bằng</span>
+                <span className="mono">{formatCurrency(costByCategory.rent)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Chi phí quảng cáo</span>
+                <span className="mono">{formatCurrency(costByCategory.ads)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Chi phí vận chuyển</span>
+                <span className="mono">{formatCurrency(costByCategory.shipping)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Chi phí nguyên vật liệu</span>
+                <span className="mono">{formatCurrency(costByCategory.material)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Chi phí khác</span>
+                <span className="mono">{formatCurrency(costByCategory.other)}</span>
+              </div>
+
+              <div style={{ ...styles.plSectionHeader, marginTop: '16px', borderTop: '2px solid #eceef0', paddingTop: '12px' }}>III. KẾT QUẢ KINH DOANH</div>
+              <div style={styles.plResultRow}>
+                <span style={{ fontWeight: 700, fontSize: '15px' }}>Lợi nhuận ròng</span>
+                <span className="mono" style={{ fontSize: '18px', fontWeight: 700, color: netProfit >= 0 ? '#006c49' : '#ba1a1a' }}>
+                  {formatCurrency(netProfit)}
+                </span>
+              </div>
+              <div style={styles.plRow}>
+                <span>Biên lợi nhuận ròng</span>
+                <span className="mono font-semibold" style={{ color: '#b45309' }}>{profitMargin.toFixed(2)}%</span>
+              </div>
             </div>
-            <div style={styles.legendItem}>
-              <span style={{ ...styles.legendDot, backgroundColor: '#ba1a1a' }}></span>
-              <span>Giá vốn sản xuất</span>
-            </div>
-            <div style={styles.legendItem}>
-              <span style={{ ...styles.legendDot, backgroundColor: '#006c49' }}></span>
-              <span>Lợi nhuận gộp</span>
+
+            {/* Right: Visual bars */}
+            <div style={styles.plVisuals}>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#45474c', marginBottom: '12px' }}>Cấu trúc tài chính</h4>
+              
+              {/* Revenue breakdown bar */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={styles.visualBarLabel}>
+                  <span>Cơ cấu doanh thu</span>
+                  <span className="mono">{formatCurrency(totalRevenue)}</span>
+                </div>
+                {totalRevenue === 0 ? (
+                  <div style={styles.emptyBar}>Chưa có doanh thu</div>
+                ) : (
+                  <div style={styles.visualBarContainer}>
+                    {Object.entries(revenueBySource).map(([key, val]) => {
+                      if (val === 0) return null;
+                      const pct = (val / totalRevenue) * 100;
+                      const colors: Record<string, string> = {
+                        shopee: '#ff5722',
+                        tiktok: '#000000',
+                        offline: '#091426',
+                        nhanh_vn: '#0084ff',
+                        manual: '#8191a9',
+                      };
+                      const names: Record<string, string> = {
+                        shopee: 'Shopee',
+                        tiktok: 'TikTok',
+                        offline: 'Offline',
+                        nhanh_vn: 'Nhanh.vn',
+                        manual: 'Nhập tay',
+                      };
+                      return (
+                        <div
+                          key={key}
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: colors[key] || '#cccccc',
+                            height: '100%',
+                            transition: 'width 0.3s ease',
+                          }}
+                          title={`${names[key]}: ${pct.toFixed(1)}% (${formatCurrency(val)})`}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Revenue Legend */}
+                {totalRevenue > 0 && (
+                  <div style={styles.visualLegendGrid}>
+                    {Object.entries(revenueBySource).map(([key, val]) => {
+                      if (val === 0) return null;
+                      const pct = (val / totalRevenue) * 100;
+                      const colors: Record<string, string> = {
+                        shopee: '#ff5722',
+                        tiktok: '#000000',
+                        offline: '#091426',
+                        nhanh_vn: '#0084ff',
+                        manual: '#8191a9',
+                      };
+                      const names: Record<string, string> = {
+                        shopee: 'Shopee',
+                        tiktok: 'TikTok',
+                        offline: 'Offline',
+                        nhanh_vn: 'Nhanh',
+                        manual: 'Tay',
+                      };
+                      return (
+                        <div key={key} style={styles.miniLegendItem}>
+                          <span style={{ ...styles.legendDot, backgroundColor: colors[key] }} />
+                          <span style={{ fontSize: '11px', color: '#45474c' }}>
+                            {names[key]} ({pct.toFixed(0)}%)
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Expense breakdown bar */}
+              <div>
+                <div style={styles.visualBarLabel}>
+                  <span>Cơ cấu chi phí</span>
+                  <span className="mono">{formatCurrency(totalCost)}</span>
+                </div>
+                {totalCost === 0 ? (
+                  <div style={styles.emptyBar}>Chưa có chi phí</div>
+                ) : (
+                  <div style={styles.visualBarContainer}>
+                    {Object.entries(costByCategory).map(([key, val]) => {
+                      if (val === 0) return null;
+                      const pct = (val / totalCost) * 100;
+                      const colors: Record<string, string> = {
+                        production: '#ba1a1a', // COGS (Red)
+                        labor: '#1976d2',
+                        rent: '#9c27b0',
+                        ads: '#e91e63',
+                        shipping: '#ffeb3b',
+                        material: '#4caf50',
+                        other: '#9e9e9e',
+                      };
+                      const names: Record<string, string> = {
+                        production: 'Giá vốn SX',
+                        labor: 'Nhân công',
+                        rent: 'Mặt bằng',
+                        ads: 'Quảng cáo',
+                        shipping: 'Vận chuyển',
+                        material: 'Nguyên vật liệu',
+                        other: 'Khác',
+                      };
+                      return (
+                        <div
+                          key={key}
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: colors[key] || '#cccccc',
+                            height: '100%',
+                            transition: 'width 0.3s ease',
+                          }}
+                          title={`${names[key]}: ${pct.toFixed(1)}% (${formatCurrency(val)})`}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Expense Legend */}
+                {totalCost > 0 && (
+                  <div style={styles.visualLegendGrid}>
+                    {Object.entries(costByCategory).map(([key, val]) => {
+                      if (val === 0) return null;
+                      const pct = (val / totalCost) * 100;
+                      const colors: Record<string, string> = {
+                        production: '#ba1a1a',
+                        labor: '#1976d2',
+                        rent: '#9c27b0',
+                        ads: '#e91e63',
+                        shipping: '#ffeb3b',
+                        material: '#4caf50',
+                        other: '#9e9e9e',
+                      };
+                      const names: Record<string, string> = {
+                        production: 'Giá vốn',
+                        labor: 'Công',
+                        rent: 'Mặt bằng',
+                        ads: 'QC',
+                        shipping: 'Ship',
+                        material: 'Vật liệu',
+                        other: 'Khác',
+                      };
+                      return (
+                        <div key={key} style={styles.miniLegendItem}>
+                          <span style={{ ...styles.legendDot, backgroundColor: colors[key] }} />
+                          <span style={{ fontSize: '11px', color: '#45474c' }}>
+                            {names[key]} ({pct.toFixed(0)}%)
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -294,108 +473,103 @@ const styles = {
     gap: '24px',
     alignItems: 'stretch',
   },
-  chartWrapper: {
-    flex: 1,
+  plContainer: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '260px',
-  },
-  chartContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    flexDirection: 'row' as const,
     gap: '24px',
+    flexWrap: 'wrap' as const,
+    marginTop: '10px',
     width: '100%',
-    alignItems: 'end',
-    height: '240px',
-    paddingTop: '20px',
   },
-  chartBarGroup: {
+  plTable: {
+    flex: 1.2,
+    minWidth: '280px',
     display: 'flex',
     flexDirection: 'column' as const,
-    height: '100%',
-    justifyContent: 'flex-end',
+    gap: '6px',
   },
-  barVisualsContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'end',
-    height: '140px',
-    gap: '4px',
-    borderBottom: '2px solid #e0e3e5',
-    paddingBottom: '2px',
-  },
-  barWrapper: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    height: '100%',
-    justifyContent: 'flex-end',
-    width: '24px',
-  },
-  bar: {
-    width: '100%',
-    borderRadius: '2px 2px 0 0',
-    position: 'relative' as const,
-    transition: 'height 0.3s ease',
-    cursor: 'pointer',
-    minHeight: '2px',
-  },
-  barLabel: {
-    display: 'none',
-  },
-  barGroupInfo: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    marginTop: '12px',
-    textAlign: 'center' as const,
-  },
-  barProductSKU: {
-    fontSize: '11px',
-    fontWeight: 600,
+  plSectionHeader: {
+    fontSize: '13px',
+    fontWeight: 700,
     color: '#091426',
-    backgroundColor: '#eceef0',
-    padding: '2px 6px',
-    borderRadius: '4px',
+    borderBottom: '1px solid #eceef0',
+    paddingBottom: '4px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
-  barProductName: {
-    fontSize: '12px',
-    color: '#45474c',
-    marginTop: '4px',
-    fontWeight: 500,
-    width: '100%',
-    whiteSpace: 'nowrap' as const,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  barProductSold: {
-    fontSize: '10px',
-    color: '#8191a9',
-    marginTop: '2px',
-  },
-  chartLegend: {
+  plTotalRow: {
     display: 'flex',
-    justifyContent: 'center',
-    gap: '24px',
-    fontSize: '12px',
-    fontWeight: 500,
-    color: '#45474c',
-    marginTop: '8px',
+    justifyContent: 'space-between',
+    fontSize: '13px',
+    fontWeight: 600,
+    padding: '4px 0',
   },
-  legendItem: {
+  plRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '12px',
+    color: '#45474c',
+    paddingLeft: '10px',
+  },
+  plResultRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 0',
+  },
+  plVisuals: {
+    flex: 0.8,
+    minWidth: '220px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px',
+    padding: '16px',
+    border: '1px solid #eceef0',
+    display: 'flex',
+    flexDirection: 'column' as const,
+  },
+  visualBarLabel: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#45474c',
+    marginBottom: '6px',
+  },
+  visualBarContainer: {
+    height: '16px',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    display: 'flex',
+    backgroundColor: '#eceef0',
+    marginBottom: '8px',
+  },
+  emptyBar: {
+    height: '16px',
+    borderRadius: '8px',
+    backgroundColor: '#eceef0',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    justifyContent: 'center',
+    fontSize: '11px',
+    color: '#8191a9',
+    marginBottom: '8px',
+  },
+  visualLegendGrid: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: '8px 12px',
+    marginTop: '6px',
+  },
+  miniLegendItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   legendDot: {
-    width: '10px',
-    height: '10px',
+    width: '8px',
+    height: '8px',
     borderRadius: '2px',
     display: 'inline-block',
-  },
-  emptyState: {
-    color: '#8191a9',
-    fontSize: '14px',
   },
   noActiveBatches: {
     display: 'flex',
