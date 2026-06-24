@@ -44,12 +44,13 @@ export const Settings: React.FC = () => {
 
     try {
       const isProduction = import.meta.env.PROD;
-      const targetUrl = 'https://pos.open.nhanh.vn/v3.0/app/getaccesstoken';
+      // Nhanh.vn v3.0 yêu cầu truyền appId trên URL query string (?appId=...), kể cả khi gửi yêu cầu POST
+      const targetUrl = `https://pos.open.nhanh.vn/v3.0/app/getaccesstoken?appId=${savedAppId}`;
       
       // Sử dụng public CORS proxy trong production (GitHub Pages) để vượt qua giới hạn CORS
       const fetchUrl = isProduction
         ? `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
-        : `/nhanh-v3/v3.0/app/getaccesstoken`; // Dev sử dụng Vite proxy
+        : `/nhanh-v3/v3.0/app/getaccesstoken?appId=${savedAppId}`; // Dev sử dụng Vite proxy
 
       const payload = {
         appId: savedAppId,
