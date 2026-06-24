@@ -10,10 +10,26 @@ import { Inventory } from './pages/Inventory';
 import { Products } from './pages/Products';
 import { Settings } from './pages/Settings';
 import { AIAssistant } from './components/AIAssistant';
+import { Login } from './components/Login';
+import type { User } from './types';
 
 const MainAppContent: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { clearData } = useApp();
+
+  // Load user from localStorage on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('silence_user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error('Failed to parse saved user:', e);
+        localStorage.removeItem('silence_user');
+      }
+    }
+  }, []);
 
   // Dynamic page title
   useEffect(() => {
@@ -34,6 +50,18 @@ const MainAppContent: React.FC = () => {
       clearData();
       window.location.reload();
     }
+  };
+
+  const handleLogin = (loggedUser: User) => {
+    setUser(loggedUser);
+    localStorage.setItem('silence_user', JSON.stringify(loggedUser));
+    // Sau khi đăng nhập luôn chuyển vào trang Tổng quan (Dashboard)
+    setCurrentPage('dashboard');
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('silence_user');
   };
 
   const getPageTitle = (page: string) => {
@@ -78,12 +106,18 @@ const MainAppContent: React.FC = () => {
     }
   };
 
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <div className="app-container">
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         onReset={handleResetData}
+        user={user}
+        onLogout={handleLogout}
       />
       
       <main className="main-content">

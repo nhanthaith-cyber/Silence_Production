@@ -99,3 +99,12 @@ export interface AppContextType {
   importAllData: (json: string) => { success: boolean; error?: string };
   clearData: () => void;
 }
+
+export type UserRole = 'admin' | 'production' | 'finance' | 'warehouse';
+
+export interface User {
+  username: string;
+  name: string;
+  role: UserRole;
+}
+

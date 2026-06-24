@@ -1,15 +1,18 @@
 import React from 'react';
 import {
-  LayoutDashboard, Factory, Receipt, Boxes, Package, Sparkles, Settings, RotateCcw
+  LayoutDashboard, Factory, Receipt, Boxes, Package, Sparkles, Settings, RotateCcw, LogOut
 } from 'lucide-react';
+import type { User } from '../types';
 
 interface SidebarProps {
   currentPage: string;
   setCurrentPage: (page: string) => void;
   onReset: () => void;
+  user: User;
+  onLogout: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, onReset }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, onReset, user, onLogout }) => {
   const menuItems = [
     { key: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { key: 'production', label: 'Sản xuất', icon: Factory },
@@ -19,6 +22,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
     { key: 'ai', label: 'Trợ lý AI', icon: Sparkles },
     { key: 'settings', label: 'Cài đặt', icon: Settings },
   ];
+
+  // Phân quyền hiển thị theo Role
+  const roleAccess: Record<string, string[]> = {
+    admin: ['dashboard', 'production', 'expenses', 'inventory', 'products', 'ai', 'settings'],
+    production: ['dashboard', 'production', 'products', 'ai'],
+    finance: ['dashboard', 'expenses', 'settings'],
+    warehouse: ['dashboard', 'inventory', 'products'],
+  };
+
+  const allowedPages = roleAccess[user.role] || ['dashboard'];
+  const filteredMenuItems = menuItems.filter((item) => allowedPages.includes(item.key));
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin': return 'QL Toàn Quyền';
+      case 'production': return 'QL Sản Xuất';
+      case 'finance': return 'QL Tài Chính';
+      case 'warehouse': return 'Thủ Kho';
+      default: return 'Nhân Viên';
+    }
+  };
 
   return (
     <aside style={styles.sidebar}>
@@ -33,9 +57,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
         </div>
       </div>
 
+      {/* User profile section */}
+      <div style={styles.userSection}>
+        <div style={styles.userAvatar}>
+          {user.name.charAt(0)}
+        </div>
+        <div style={styles.userInfo}>
+          <div style={styles.userName}>{user.name}</div>
+          <div style={styles.userRoleBadge}>{getRoleLabel(user.role)}</div>
+        </div>
+      </div>
+
       {/* Navigation */}
       <nav style={styles.nav}>
-        {menuItems.map((item) => {
+        {filteredMenuItems.map((item) => {
           const isActive = currentPage === item.key;
           const IconComponent = item.icon;
           return (
@@ -67,6 +102,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
         >
           <RotateCcw size={14} />
           <span>Đặt lại dữ liệu</span>
+        </button>
+        <button
+          onClick={onLogout}
+          style={styles.logoutBtn}
+          title="Đăng xuất khỏi hệ thống"
+        >
+          <LogOut size={14} />
+          <span>Đăng xuất</span>
         </button>
         <div style={styles.version} className="mono">v2.0 — Production</div>
       </div>
@@ -147,6 +190,48 @@ const styles = {
     color: '#ffffff',
     fontWeight: 600,
   },
+  userSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '16px 20px',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  userAvatar: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    backgroundColor: '#006c49',
+    color: '#ffffff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 700,
+    fontSize: '14px',
+  },
+  userInfo: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  userName: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#ffffff',
+  },
+  userRoleBadge: {
+    alignSelf: 'flex-start',
+    fontSize: '10px',
+    fontWeight: 600,
+    color: '#ffffff',
+    backgroundColor: 'rgba(0,108,73,0.3)',
+    border: '1px solid rgba(0,108,73,0.4)',
+    padding: '1px 5px',
+    borderRadius: '4px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
   footer: {
     padding: '16px 20px',
     borderTop: '1px solid rgba(255,255,255,0.08)',
@@ -163,7 +248,19 @@ const styles = {
     color: '#6b91b8',
     fontSize: '12px',
     cursor: 'pointer',
-    padding: '6px 0',
+    padding: '4px 0',
+  },
+  logoutBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    background: 'none',
+    border: 'none',
+    color: '#ffdad6',
+    fontSize: '12px',
+    cursor: 'pointer',
+    padding: '4px 0',
+    transition: 'color 0.15s ease',
   },
   version: {
     fontSize: '10px',
