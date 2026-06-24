@@ -30,9 +30,9 @@ const MainAppContent: React.FC = () => {
       }
     }
 
-    // Phát hiện OAuth callback từ Nhanh.vn (?code=XXXX trong URL)
+    // Phát hiện OAuth callback từ Nhanh.vn (?accessCode=XXXX hoặc ?code=XXXX trong URL)
     const urlParams = new URLSearchParams(window.location.search);
-    const oauthCode = urlParams.get('code');
+    const oauthCode = urlParams.get('accessCode') || urlParams.get('code');
     if (oauthCode) {
       localStorage.setItem('silence_nhanh_oauth_code', oauthCode);
       // Xóa code khỏi URL (bảo mật)

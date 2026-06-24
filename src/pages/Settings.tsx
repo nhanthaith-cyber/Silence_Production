@@ -32,7 +32,6 @@ export const Settings: React.FC = () => {
 
     const savedAppId = localStorage.getItem('silence_nhanh_app_id') || appId.trim();
     const savedSecretKey = localStorage.getItem('silence_nhanh_secret_key') || secretKey.trim();
-    const redirectUri = `${window.location.origin}${window.location.pathname}`;
 
     if (!savedAppId || !savedSecretKey) {
       setOauthStatus({
@@ -48,33 +47,53 @@ export const Settings: React.FC = () => {
       formData.append('version', '3.0');
       formData.append('appId', savedAppId);
       formData.append('secretKey', savedSecretKey);
-      formData.append('code', code);
-      formData.append('grantType', 'authorization_code');
-      formData.append('redirectUri', redirectUri);
+      formData.append('accessCode', code); // Nhanh.vn v3.0 endpoint requires accessCode
+      formData.append('code', code); // Fallback for some environments
 
-      const response = await fetch('https://nhanh.vn/oauth/token', {
+      const isProduction = import.meta.env.PROD;
+      const targetUrl = 'https://pos.open.nhanh.vn/v3.0/app/getaccesstoken';
+      
+      // Sử dụng public CORS proxy trong production (GitHub Pages) để vượt qua giới hạn CORS
+      const fetchUrl = isProduction
+        ? `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
+        : `/nhanh-v3/v3.0/app/getaccesstoken`; // Dev sử dụng Vite proxy
+
+      const response = await fetch(fetchUrl, {
         method: 'POST',
         body: formData,
       });
 
-      const data = await response.json();
-      const token = data?.data?.accessToken || data?.accessToken || data?.access_token || data?.data?.access_token;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      if (token) {
-        setAccessToken(token);
-        localStorage.setItem('silence_nhanh_access_token', token);
-        setOauthStatus({ type: 'success', msg: '✅ Lấy Access Token thành công! Đã lưu vào hệ thống.' });
+      const data = await response.json();
+      
+      // Trả về từ Nhanh.vn v3.0: { code: 1, data: { accessToken: "...", businessId: "..." } }
+      if (data && data.code === 1 && data.data) {
+        const token = data.data.accessToken;
+        const bizId = data.data.businessId;
+
+        if (token) {
+          setAccessToken(token);
+          localStorage.setItem('silence_nhanh_access_token', token);
+          if (bizId) {
+            setBusinessId(String(bizId));
+            localStorage.setItem('silence_nhanh_business_id', String(bizId));
+          }
+          setOauthStatus({ type: 'success', msg: '✅ Lấy Access Token thành công! Đã lưu vào hệ thống.' });
+        } else {
+          throw new Error('Không tìm thấy accessToken trong dữ liệu trả về.');
+        }
       } else {
-        throw new Error(data?.messages?.[0] || JSON.stringify(data));
+        const errorMsg = data?.messages?.[0] || data?.message || JSON.stringify(data);
+        throw new Error(errorMsg || 'Phản hồi lỗi từ server Nhanh.vn');
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      const isCorS = errMsg.includes('fetch') || errMsg.includes('CORS') || errMsg.includes('network');
       setOauthStatus({
         type: 'error',
-        msg: isCorS
-          ? `Không thể tự động lấy token do giới hạn CORS. Hãy dùng Postman/curl để đổi code: "${code}"`
-          : `Lỗi: ${errMsg}`,
+        msg: `Không thể tự động lấy token: ${errMsg}. Bạn có thể dùng Postman/curl gửi POST tới "https://pos.open.nhanh.vn/v3.0/app/getaccesstoken" với các tham số (appId, secretKey, accessCode: "${code}") để lấy token và tự nhập vào ô bên dưới.`,
       });
     } finally {
       setIsExchanging(false);
@@ -105,7 +124,8 @@ export const Settings: React.FC = () => {
 
     const redirectUri = encodeURIComponent(`${window.location.origin}${window.location.pathname}`);
     const scopes = encodeURIComponent('viewOrder,updateInventory,updateProduct,viewProduct');
-    const oauthUrl = `https://nhanh.vn/oauth?version=3.0&appId=${id}&redirectUri=${redirectUri}&responseType=code&scopes=${scopes}`;
+    // Nhanh.vn v3.0 sử dụng parameter returnLink hoặc redirectUri, và version=v3.0
+    const oauthUrl = `https://nhanh.vn/oauth?version=v3.0&appId=${id}&redirectUri=${redirectUri}&returnLink=${redirectUri}&responseType=code&scopes=${scopes}`;
     window.location.href = oauthUrl;
   };
 
