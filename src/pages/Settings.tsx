@@ -43,13 +43,6 @@ export const Settings: React.FC = () => {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('version', '3.0');
-      formData.append('appId', savedAppId);
-      formData.append('secretKey', savedSecretKey);
-      formData.append('accessCode', code); // Nhanh.vn v3.0 endpoint requires accessCode
-      formData.append('code', code); // Fallback for some environments
-
       const isProduction = import.meta.env.PROD;
       const targetUrl = 'https://pos.open.nhanh.vn/v3.0/app/getaccesstoken';
       
@@ -58,9 +51,18 @@ export const Settings: React.FC = () => {
         ? `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`
         : `/nhanh-v3/v3.0/app/getaccesstoken`; // Dev sử dụng Vite proxy
 
+      const payload = {
+        appId: savedAppId,
+        secretKey: savedSecretKey,
+        accessCode: code
+      };
+
       const response = await fetch(fetchUrl, {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
