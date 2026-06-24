@@ -1,12 +1,24 @@
 import OpenAI from 'openai';
 
-// Khởi tạo OpenAI client từ API key trong .env.local
-const client = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  // dangerouslyAllowBrowser: true vì đây là môi trường dev/demo
-  // Production nên dùng backend proxy để bảo vệ API key
-  dangerouslyAllowBrowser: true,
-});
+// Lazy initialization: client chỉ được tạo khi thực sự gọi API
+// Tránh crash toàn bộ app khi không có API key (ví dụ: GitHub Pages)
+let _client: OpenAI | null = null;
+
+function getClient(): OpenAI {
+  if (!_client) {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        'Chưa cấu hình API key cho AI. Tính năng AI chưa khả dụng trong phiên bản demo này.'
+      );
+    }
+    _client = new OpenAI({
+      apiKey,
+      dangerouslyAllowBrowser: true,
+    });
+  }
+  return _client;
+}
 
 /**
  * Gọi OpenAI và trả về toàn bộ response cùng lúc.
@@ -15,7 +27,7 @@ export async function askOpenAI(
   prompt: string,
   model: string = 'gpt-4o'
 ): Promise<string> {
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -31,7 +43,7 @@ export async function streamOpenAI(
   onChunk: (text: string) => void,
   model: string = 'gpt-4o'
 ): Promise<void> {
-  const stream = await client.chat.completions.create({
+  const stream = await getClient().chat.completions.create({
     model,
     messages: [{ role: 'user', content: prompt }],
     stream: true,
