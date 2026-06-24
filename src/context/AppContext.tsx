@@ -26,41 +26,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load from LocalStorage or seed defaults
   useEffect(() => {
-    const localProducts = localStorage.getItem('silence_prod_products');
-    const localBatches = localStorage.getItem('silence_prod_batches');
-    const localSales = localStorage.getItem('silence_prod_sales');
-    const localExpenses = localStorage.getItem('silence_prod_expenses');
-    const localSyncLogs = localStorage.getItem('silence_sync_logs');
-    const localLastSync = localStorage.getItem('silence_last_sync');
-    const localApiMode = localStorage.getItem('silence_nhanh_api_mode');
+    try {
+      const localProducts = localStorage.getItem('silence_prod_products');
+      const localBatches = localStorage.getItem('silence_prod_batches');
+      const localSales = localStorage.getItem('silence_prod_sales');
+      const localExpenses = localStorage.getItem('silence_prod_expenses');
+      const localSyncLogs = localStorage.getItem('silence_sync_logs');
+      const localLastSync = localStorage.getItem('silence_last_sync');
+      const localApiMode = localStorage.getItem('silence_nhanh_api_mode');
 
-    if (localProducts) setProducts(JSON.parse(localProducts));
-    else {
+      if (localProducts) setProducts(JSON.parse(localProducts));
+      else {
+        setProducts(defaultProducts);
+        localStorage.setItem('silence_prod_products', JSON.stringify(defaultProducts));
+      }
+
+      if (localBatches) setProductionBatches(JSON.parse(localBatches));
+      else {
+        setProductionBatches(defaultBatches);
+        localStorage.setItem('silence_prod_batches', JSON.stringify(defaultBatches));
+      }
+
+      if (localSales) setSales(JSON.parse(localSales));
+      else {
+        setSales(defaultSales);
+        localStorage.setItem('silence_prod_sales', JSON.stringify(defaultSales));
+      }
+
+      if (localExpenses) setExpenses(JSON.parse(localExpenses));
+      else {
+        setExpenses(defaultExpenses);
+        localStorage.setItem('silence_prod_expenses', JSON.stringify(defaultExpenses));
+      }
+
+      if (localSyncLogs) setSyncLogs(JSON.parse(localSyncLogs));
+      if (localLastSync) setLastSyncTime(localLastSync);
+      if (localApiMode === 'live' || localApiMode === 'sandbox') setApiModeState(localApiMode as NhanhApiMode);
+    } catch (e) {
+      console.error('Error loading data from localStorage, resetting to defaults:', e);
+      // Fallback to default values
       setProducts(defaultProducts);
-      localStorage.setItem('silence_prod_products', JSON.stringify(defaultProducts));
-    }
-
-    if (localBatches) setProductionBatches(JSON.parse(localBatches));
-    else {
       setProductionBatches(defaultBatches);
-      localStorage.setItem('silence_prod_batches', JSON.stringify(defaultBatches));
-    }
-
-    if (localSales) setSales(JSON.parse(localSales));
-    else {
       setSales(defaultSales);
-      localStorage.setItem('silence_prod_sales', JSON.stringify(defaultSales));
-    }
-
-    if (localExpenses) setExpenses(JSON.parse(localExpenses));
-    else {
       setExpenses(defaultExpenses);
+      
+      // Save clean defaults to prevent looping errors
+      localStorage.setItem('silence_prod_products', JSON.stringify(defaultProducts));
+      localStorage.setItem('silence_prod_batches', JSON.stringify(defaultBatches));
+      localStorage.setItem('silence_prod_sales', JSON.stringify(defaultSales));
       localStorage.setItem('silence_prod_expenses', JSON.stringify(defaultExpenses));
     }
-
-    if (localSyncLogs) setSyncLogs(JSON.parse(localSyncLogs));
-    if (localLastSync) setLastSyncTime(localLastSync);
-    if (localApiMode === 'live' || localApiMode === 'sandbox') setApiModeState(localApiMode as NhanhApiMode);
 
     // Kiểm tra kết nối ban đầu
     checkNhanhConnection().then((result) => {
