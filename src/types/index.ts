@@ -92,7 +92,7 @@ export interface AppContextType {
   addExpense: (expense: Omit<Expense, 'id' | 'expenseDate'>) => void;
 
   // Sync Nhanh.vn
-  syncSalesFromNhanh: () => Promise<number>;
+  syncSalesFromNhanh: (fromDate?: string, toDate?: string) => Promise<number>;
   syncStockFromNhanh: () => Promise<number>;
   syncStockToNhanh: (sku: string) => Promise<boolean>;
 

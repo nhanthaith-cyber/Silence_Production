@@ -16,6 +16,8 @@ export const Expenses: React.FC = () => {
   // Sync states
   const [syncStatus, setSyncStatus] = useState<{ qty: number; success: boolean; extraInfo?: string } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncFromDate, setSyncFromDate] = useState('');
+  const [syncToDate, setSyncToDate] = useState('');
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +43,10 @@ export const Expenses: React.FC = () => {
     setSyncStatus(null);
 
     try {
-      const qty = await syncSalesFromNhanh();
+      const qty = await syncSalesFromNhanh(
+        syncFromDate || undefined,
+        syncToDate || undefined
+      );
       const stockCount = await syncStockFromNhanh();
       setSyncStatus({
         qty,
@@ -173,11 +178,54 @@ export const Expenses: React.FC = () => {
               Tải về đơn hàng mới nhất từ tất cả kênh bán hàng trên Nhanh.vn: <strong>Shopee</strong>, <strong>TikTok</strong>, <strong>Lên ngoài</strong>. Dữ liệu tự động phân loại theo nguồn.
             </p>
 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '14px 0', borderTop: '1px dashed #eceef0', paddingTop: '14px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#091426' }}>Khoảng thời gian đồng bộ:</span>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#8191a9', fontWeight: 500 }}>Từ ngày</label>
+                  <input
+                    type="date"
+                    value={syncFromDate}
+                    onChange={(e) => setSyncFromDate(e.target.value)}
+                    style={{
+                      padding: '8px 10px',
+                      fontSize: '13px',
+                      border: '1px solid #eceef0',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      backgroundColor: '#f8f9fa',
+                      color: '#091426',
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '11px', color: '#8191a9', fontWeight: 500 }}>Đến ngày</label>
+                  <input
+                    type="date"
+                    value={syncToDate}
+                    onChange={(e) => setSyncToDate(e.target.value)}
+                    style={{
+                      padding: '8px 10px',
+                      fontSize: '13px',
+                      border: '1px solid #eceef0',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      backgroundColor: '#f8f9fa',
+                      color: '#091426',
+                    }}
+                  />
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', color: '#8191a9', fontStyle: 'italic' }}>
+                * Để trống để tự động quét 7 ngày gần nhất.
+              </span>
+            </div>
+
             <button
               onClick={handleSyncNhanh}
               className="btn btn-primary"
               disabled={isSyncing}
-              style={{ width: '100%', gap: '8px', marginTop: '8px' }}
+              style={{ width: '100%', gap: '8px', marginTop: '4px' }}
             >
               <RefreshCw size={14} className={isSyncing ? 'spin-anim' : ''} />
               <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ đơn hàng từ Nhanh.vn'}</span>

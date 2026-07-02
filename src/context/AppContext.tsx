@@ -296,9 +296,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================
 
   /** Đồng bộ đơn hàng từ Nhanh.vn (tất cả nguồn: Shopee, Tiktok, Lên ngoài) */
-  const syncSalesFromNhanh = async (): Promise<number> => {
+  const syncSalesFromNhanh = async (fromDate?: string, toDate?: string): Promise<number> => {
     try {
-      const nhanhOrders = await fetchNhanhOrders();
+      const nhanhOrders = await fetchNhanhOrders(fromDate, toDate);
 
       if (nhanhOrders.length === 0) {
         addSyncLog('Nhanh.vn', 'Đồng bộ đơn hàng', connectionStatus === 'connected' ? 'success' : 'sandbox',

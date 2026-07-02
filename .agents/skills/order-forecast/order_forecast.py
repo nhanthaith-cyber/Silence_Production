@@ -82,7 +82,12 @@ def compute_forecast(
         total_sold = sum(
             s.get("quantity", 0) for s in sales if s.get("productSku") == sku
         )
-        available = max(0, total_produced - total_sold)
+        # 2. Available stock = completed batches - total sold (or nhanhStock if synchronized)
+        nhanh_stock = prod.get("nhanhStock")
+        if nhanh_stock is not None:
+            available = int(nhanh_stock)
+        else:
+            available = max(0, total_produced - total_sold)
 
         # 3. In-production stock = running batches
         in_production = sum(

@@ -85,10 +85,12 @@ export const Forecast: React.FC = () => {
             .filter((i) => i.productSku === prod.sku)
             .reduce((s, i) => s + i.quantity, 0);
         }, 0);
+      // 2. Available stock = Tồn kho thực tế
+      // Ưu tiên dùng số lượng nhanhStock đồng bộ từ Nhanh.vn (nếu có)
       const totalSold = sales
         .filter((s) => s.productSku === prod.sku)
         .reduce((sum, s) => sum + s.quantity, 0);
-      const available = Math.max(0, totalProduced - totalSold);
+      const available = prod.nhanhStock !== undefined ? prod.nhanhStock : Math.max(0, totalProduced - totalSold);
 
       // 3. In-production stock = running batches
       const inProduction = productionBatches
