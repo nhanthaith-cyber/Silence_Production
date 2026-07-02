@@ -7,8 +7,8 @@ Tệp này cung cấp thông tin ngữ cảnh, quy tắc và chỉ dẫn cốt l
 ## 📌 Tổng quan dự án (Project Overview)
 
 - **Tên dự án:** Silence Production
-- **Mục tiêu:** [Mô tả ngắn gọn về mục tiêu và sản phẩm của dự án]
-- **Stack công nghệ chính:** [Ví dụ: React, Next.js, Node.js, PostgreSQL...]
+- **Mục tiêu:** Hệ thống quản lý sản xuất cho bên đi gia công, đồng bộ một số thứ qua nhanh.vn.
+- **Stack công nghệ chính:** React (TypeScript), Vite, LocalStorage.
 
 ---
 
