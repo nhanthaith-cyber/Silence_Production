@@ -13,13 +13,19 @@ export const Inventory: React.FC = () => {
   const inventoryData = products.map((prod) => {
     // 1. In Production = Running batches quantity
     const inProduction = productionBatches
-      .filter((b) => b.productSku === prod.sku && b.status === 'running')
-      .reduce((sum, b) => sum + b.quantity, 0);
+      .filter((b) => b.status === 'running')
+      .reduce((sum, b) => {
+        const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
+        return sum + itemQty;
+      }, 0);
 
     // 2. Ready (total produced) = Completed batches quantity
     const totalProduced = productionBatches
-      .filter((b) => b.productSku === prod.sku && b.status === 'completed')
-      .reduce((sum, b) => sum + b.quantity, 0);
+      .filter((b) => b.status === 'completed')
+      .reduce((sum, b) => {
+        const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
+        return sum + itemQty;
+      }, 0);
 
     // 3. Sold = Sales quantity
     const sold = sales

@@ -44,8 +44,8 @@ export const getProductionMetrics = (batches: ProductionBatch[]): ProductionMetr
     completedBatches: completed.length,
     completionRate: batches.length > 0 ? (completed.length / batches.length) * 100 : 0,
     avgLeadTimeDays: completed.length > 0 ? Math.round(totalLeadDays / completed.length) : 0,
-    totalUnitsProduced: completed.reduce((sum, b) => sum + b.quantity, 0),
-    totalUnitsInProgress: active.reduce((sum, b) => sum + b.quantity, 0),
+    totalUnitsProduced: completed.reduce((sum, b) => sum + b.items.reduce((s, i) => s + i.quantity, 0), 0),
+    totalUnitsInProgress: active.reduce((sum, b) => sum + b.items.reduce((s, i) => s + i.quantity, 0), 0),
   };
 };
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  LayoutDashboard, Factory, Receipt, Boxes, Package, Sparkles, Settings, RotateCcw, LogOut
+  LayoutDashboard, Factory, Receipt, Boxes, Package, Sparkles, Settings, RotateCcw, LogOut, TrendingUp
 } from 'lucide-react';
 import type { User } from '../types';
 
@@ -19,16 +19,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
     { key: 'expenses', label: 'Chi phí & Đồng bộ', icon: Receipt },
     { key: 'inventory', label: 'Tồn kho', icon: Boxes },
     { key: 'products', label: 'Sản phẩm', icon: Package },
+    { key: 'forecast', label: 'Dự báo gọi hàng', icon: TrendingUp },
     { key: 'ai', label: 'Trợ lý AI', icon: Sparkles },
     { key: 'settings', label: 'Cài đặt', icon: Settings },
   ];
 
   // Phân quyền hiển thị theo Role
   const roleAccess: Record<string, string[]> = {
-    admin: ['dashboard', 'production', 'expenses', 'inventory', 'products', 'ai', 'settings'],
+    admin: ['dashboard', 'production', 'expenses', 'inventory', 'products', 'forecast', 'ai', 'settings'],
     production: ['dashboard', 'production', 'products', 'ai'],
     finance: ['dashboard', 'expenses', 'settings'],
-    warehouse: ['dashboard', 'inventory', 'products'],
+    warehouse: ['dashboard', 'inventory', 'products', 'forecast'],
   };
 
   const allowedPages = roleAccess[user.role] || ['dashboard'];

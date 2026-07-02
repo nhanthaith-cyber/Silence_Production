@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import type {
-  Product, ProductionBatch, ProductionStage, Sale, Expense,
+  Product, ProductionBatch, ProductionBatchItem, ProductionStage, Sale, Expense,
   AppContextType, NhanhApiMode, ConnectionStatus, SyncLog
 } from '../types';
 import { defaultProducts, defaultBatches, defaultSales, defaultExpenses } from '../data/defaultData';
@@ -11,6 +11,24 @@ import { exportAllData as exportData, parseImportData } from '../services/produc
 
 // Export context để hook useApp có thể truy cập
 export const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// Helper: migrate batches from old single-SKU format to new items[] format
+const migrateBatches = (batches: ProductionBatch[]): ProductionBatch[] =>
+  batches.map((b) => {
+    if (b.items && b.items.length > 0) return b; // Already new format
+    // Old format: has productSku and quantity at top level
+    const legacySku = (b as unknown as { productSku?: string }).productSku;
+    const legacyQty = (b as unknown as { quantity?: number }).quantity;
+    const oldStageMap: Record<string, string> = {
+      cutting: 'ordered', sewing: 'paid', finishing: 'shipping', qc: 'producing', ready: 'delivered',
+    };
+    const migratedStage = (oldStageMap[(b.currentStage as string)] ?? b.currentStage) as ProductionBatch['currentStage'];
+    return {
+      ...b,
+      currentStage: migratedStage,
+      items: legacySku ? [{ productSku: legacySku, quantity: legacyQty ?? 0 }] : [],
+    };
+  });
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -41,10 +59,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('silence_prod_products', JSON.stringify(defaultProducts));
       }
 
-      if (localBatches) setProductionBatches(JSON.parse(localBatches));
-      else {
-        setProductionBatches(defaultBatches);
-        localStorage.setItem('silence_prod_batches', JSON.stringify(defaultBatches));
+      if (localBatches) {
+        const raw = JSON.parse(localBatches);
+        const migrated = migrateBatches(raw);
+        setProductionBatches(migrated);
+        // Persist migrated data if it changed
+        if (JSON.stringify(raw) !== JSON.stringify(migrated)) {
+          localStorage.setItem('silence_prod_batches', JSON.stringify(migrated));
+        }
+      } else {
+        const migrated = migrateBatches(defaultBatches);
+        setProductionBatches(migrated);
+        localStorage.setItem('silence_prod_batches', JSON.stringify(migrated));
       }
 
       if (localSales) setSales(JSON.parse(localSales));
@@ -64,13 +90,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (localApiMode === 'live' || localApiMode === 'sandbox') setApiModeState(localApiMode as NhanhApiMode);
     } catch (e) {
       console.error('Error loading data from localStorage, resetting to defaults:', e);
-      // Fallback to default values
       setProducts(defaultProducts);
       setProductionBatches(defaultBatches);
       setSales(defaultSales);
       setExpenses(defaultExpenses);
-      
-      // Save clean defaults to prevent looping errors
       localStorage.setItem('silence_prod_products', JSON.stringify(defaultProducts));
       localStorage.setItem('silence_prod_batches', JSON.stringify(defaultBatches));
       localStorage.setItem('silence_prod_sales', JSON.stringify(defaultSales));
@@ -174,14 +197,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveToLocal('silence_prod_products', updated);
   };
 
-  const createProductionBatch = (batch: { productSku: string; quantity: number; targetDate: string }) => {
+  const createProductionBatch = (batch: { items: ProductionBatchItem[]; targetDate: string }) => {
     const today = getTodayISO();
     const rand = Math.floor(Math.random() * 9000) + 1000;
     const newBatch: ProductionBatch = {
       id: `LOT-${today.replace(/-/g, '')}-${rand}`,
-      productSku: batch.productSku,
-      quantity: batch.quantity,
-      currentStage: 'cutting',
+      items: batch.items,
+      currentStage: 'ordered',
       status: 'running',
       targetDate: batch.targetDate,
       createdAt: today,
@@ -192,7 +214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const advanceBatchStage = (batchId: string) => {
-    const stages: ProductionStage[] = ['cutting', 'sewing', 'finishing', 'qc', 'ready'];
+    const stages: ProductionStage[] = ['ordered', 'paid', 'shipping', 'producing', 'delivered'];
     const updated = productionBatches.map((batch) => {
       if (batch.id !== batchId) return batch;
 
@@ -200,7 +222,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (currentIndex === -1 || currentIndex === stages.length - 1) return batch;
 
       const nextStage = stages[currentIndex + 1];
-      const isCompleted = nextStage === 'ready';
+      const isCompleted = nextStage === 'delivered';
 
       return {
         ...batch,
@@ -317,10 +339,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   /** Đẩy tồn kho khả dụng từ xưởng lên Nhanh.vn */
   const syncStockToNhanh = async (sku: string): Promise<boolean> => {
     try {
-      // Tính tồn kho khả dụng
+      // Tính tồn kho khả dụng từ items[] của các lô đã hoàn thành
       const totalReady = productionBatches
-        .filter((b) => b.productSku === sku && b.status === 'completed')
-        .reduce((sum, b) => sum + b.quantity, 0);
+        .filter((b) => b.status === 'completed')
+        .reduce((sum, b) => {
+          const itemQty = b.items.filter((i) => i.productSku === sku).reduce((s, i) => s + i.quantity, 0);
+          return sum + itemQty;
+        }, 0);
       const totalSold = sales
         .filter((s) => s.productSku === sku)
         .reduce((sum, s) => sum + s.quantity, 0);
@@ -374,13 +399,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const { data } = result;
+    const migratedBatches = migrateBatches(data.productionBatches);
     setProducts(data.products);
-    setProductionBatches(data.productionBatches);
+    setProductionBatches(migratedBatches);
     setSales(data.sales);
     setExpenses(data.expenses);
 
     saveToLocal('silence_prod_products', data.products);
-    saveToLocal('silence_prod_batches', data.productionBatches);
+    saveToLocal('silence_prod_batches', migratedBatches);
     saveToLocal('silence_prod_sales', data.sales);
     saveToLocal('silence_prod_expenses', data.expenses);
 

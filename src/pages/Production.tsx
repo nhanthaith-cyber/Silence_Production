@@ -7,21 +7,44 @@ export const Production: React.FC = () => {
   const { products, productionBatches, createProductionBatch, advanceBatchStage, deleteProductionBatch } = useApp();
 
   // Form states
-  const [productSku, setProductSku] = useState('');
-  const [quantity, setQuantity] = useState('');
+  const [formItems, setFormItems] = useState<{ productSku: string; quantity: string }[]>(
+    [{ productSku: '', quantity: '' }]
+  );
   const [targetDate, setTargetDate] = useState('');
   const [error, setError] = useState('');
+
+  const addFormItem = () => {
+    setFormItems([...formItems, { productSku: '', quantity: '' }]);
+  };
+
+  const removeFormItem = (index: number) => {
+    if (formItems.length === 1) return;
+    setFormItems(formItems.filter((_, i) => i !== index));
+  };
+
+  const updateFormItem = (index: number, field: 'productSku' | 'quantity', value: string) => {
+    const updated = [...formItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormItems(updated);
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!productSku) {
-      setError('Vui lòng chọn sản phẩm!');
+    // Validations
+    if (formItems.some((item) => !item.productSku)) {
+      setError('Vui lòng chọn sản phẩm cho tất cả các dòng!');
       return;
     }
-    if (!quantity || parseInt(quantity) <= 0) {
+    if (formItems.some((item) => !item.quantity || parseInt(item.quantity) <= 0)) {
       setError('Số lượng sản xuất phải lớn hơn 0!');
+      return;
+    }
+    const skus = formItems.map((item) => item.productSku);
+    const hasDuplicate = skus.some((sku, idx) => skus.indexOf(sku) !== idx);
+    if (hasDuplicate) {
+      setError('Không thể chọn trùng sản phẩm (SKU) trong cùng một lệnh!');
       return;
     }
     if (!targetDate) {
@@ -30,13 +53,15 @@ export const Production: React.FC = () => {
     }
 
     createProductionBatch({
-      productSku,
-      quantity: parseInt(quantity),
+      items: formItems.map((item) => ({
+        productSku: item.productSku,
+        quantity: parseInt(item.quantity),
+      })),
       targetDate,
     });
 
     // Reset form
-    setQuantity('');
+    setFormItems([{ productSku: '', quantity: '' }]);
     setTargetDate('');
   };
 
@@ -44,11 +69,11 @@ export const Production: React.FC = () => {
   const completedBatches = productionBatches.filter((b) => b.status === 'completed');
 
   const stages: { key: ProductionStage; label: string }[] = [
-    { key: 'cutting', label: '1. Cắt vải' },
-    { key: 'sewing', label: '2. May ráp' },
-    { key: 'finishing', label: '3. Hoàn thiện' },
-    { key: 'qc', label: '4. Kiểm phẩm' },
-    { key: 'ready', label: '5. Nhập kho' },
+    { key: 'ordered', label: '1. Đã đặt hàng' },
+    { key: 'paid', label: '2. Đã thanh toán' },
+    { key: 'shipping', label: '3. Đang vận chuyển' },
+    { key: 'producing', label: '4. Đang sản xuất' },
+    { key: 'delivered', label: '5. Đã nhập kho' },
   ];
 
   return (
@@ -56,7 +81,7 @@ export const Production: React.FC = () => {
       <div style={styles.pageHeader}>
         <div>
           <h2 style={{ color: '#091426', fontSize: '24px', fontWeight: 700 }}>Quản lý tiến độ sản xuất</h2>
-          <p style={{ color: '#8191a9', fontSize: '13px' }}>Tạo lệnh sản xuất mới và theo dõi chi tiết tiến độ xưởng gia công qua 5 bước</p>
+          <p style={{ color: '#8191a9', fontSize: '13px' }}>Tạo lệnh sản xuất mới (đa SKU) và theo dõi chi tiết tiến độ qua 5 bước</p>
         </div>
       </div>
 
@@ -68,28 +93,87 @@ export const Production: React.FC = () => {
           </div>
 
           <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="form-group">
-              <label>Sản phẩm gia công</label>
-              <select value={productSku} onChange={(e) => setProductSku(e.target.value)} required>
-                <option value="">-- Chọn sản phẩm --</option>
-                {products.map((p) => (
-                  <option key={p.sku} value={p.sku}>
-                    {p.name} ({p.sku})
-                  </option>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                Danh sách sản phẩm gia công
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {formItems.map((item, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                    <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>Sản phẩm {index + 1}</span>
+                      <select
+                        value={item.productSku}
+                        onChange={(e) => updateFormItem(index, 'productSku', e.target.value)}
+                        required
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">-- Chọn sản phẩm --</option>
+                        {products.map((p) => (
+                          <option key={p.sku} value={p.sku}>
+                            {p.name} ({p.sku})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>SL</span>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="SL"
+                        value={item.quantity}
+                        onChange={(e) => updateFormItem(index, 'quantity', e.target.value)}
+                        required
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    {formItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFormItem(index)}
+                        style={{
+                          backgroundColor: '#fee2e2',
+                          color: '#ef4444',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '8px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '38px',
+                        }}
+                        title="Xóa dòng sản phẩm"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 ))}
-              </select>
-            </div>
+              </div>
 
-            <div className="form-group">
-              <label>Số lượng sản xuất (Cái)</label>
-              <input
-                type="number"
-                min="1"
-                placeholder="Ví dụ: 100"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                required
-              />
+              <button
+                type="button"
+                onClick={addFormItem}
+                className="btn"
+                style={{
+                  marginTop: '12px',
+                  backgroundColor: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px dashed #cbd5e1',
+                  width: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px',
+                  fontSize: '13px',
+                }}
+              >
+                <Plus size={14} />
+                <span>Thêm sản phẩm</span>
+              </button>
             </div>
 
             <div className="form-group">
@@ -129,7 +213,6 @@ export const Production: React.FC = () => {
             ) : (
               <div style={styles.pipelineContainer}>
                 {activeBatches.map((batch) => {
-                  const prod = products.find((p) => p.sku === batch.productSku);
                   const currentStageIndex = stages.findIndex((s) => s.key === batch.currentStage);
 
                   return (
@@ -137,7 +220,7 @@ export const Production: React.FC = () => {
                       <div style={styles.batchHeader}>
                         <div>
                           <span className="mono" style={styles.batchId}>{batch.id}</span>
-                          <span style={styles.productName}> • {prod?.name || batch.productSku}</span>
+                          <span style={styles.productName}> • Lô hàng ({batch.items.length} sản phẩm)</span>
                         </div>
                         <button
                           onClick={() => deleteProductionBatch(batch.id)}
@@ -148,9 +231,21 @@ export const Production: React.FC = () => {
                         </button>
                       </div>
 
+                      <div style={styles.batchItemsList}>
+                        {batch.items.map((item) => {
+                          const prod = products.find((p) => p.sku === item.productSku);
+                          return (
+                            <div key={item.productSku} style={styles.batchItemRow}>
+                              <span>{prod?.name || item.productSku} (<span className="mono">{item.productSku}</span>)</span>
+                              <strong className="mono">x{item.quantity}</strong>
+                            </div>
+                          );
+                        })}
+                      </div>
+
                       <div style={styles.batchMeta}>
-                        <div>Số lượng: <strong className="mono">{batch.quantity}</strong> cái</div>
-                        <div>Hạn: <strong className="mono">{batch.targetDate}</strong></div>
+                        <div>Tổng số lượng: <strong className="mono">{batch.items.reduce((sum, i) => sum + i.quantity, 0)}</strong> cái</div>
+                        <div>Hạn hoàn thành: <strong className="mono">{batch.targetDate}</strong></div>
                       </div>
 
                       {/* Visual Flow Steps */}
@@ -249,12 +344,35 @@ export const Production: React.FC = () => {
                     </tr>
                   ) : (
                     completedBatches.map((batch) => {
-                      const prod = products.find((p) => p.sku === batch.productSku);
                       return (
                         <tr key={batch.id}>
                           <td className="mono" style={{ fontWeight: 600 }}>{batch.id}</td>
-                          <td>{prod?.name || batch.productSku}</td>
-                          <td className="mono">{batch.quantity}</td>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {batch.items.map((item) => {
+                                const prod = products.find((p) => p.sku === item.productSku);
+                                return (
+                                  <div key={item.productSku} style={{ fontSize: '13px' }}>
+                                    {prod?.name || item.productSku} ({item.productSku})
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                          <td className="mono">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {batch.items.map((item) => (
+                                <div key={item.productSku} style={{ fontWeight: 600 }}>
+                                  {item.quantity}
+                                </div>
+                              ))}
+                              {batch.items.length > 1 && (
+                                <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '4px', paddingTop: '2px', color: '#64748b' }}>
+                                  Tổng: {batch.items.reduce((sum, i) => sum + i.quantity, 0)}
+                                </div>
+                              )}
+                            </div>
+                          </td>
                           <td className="mono">{batch.createdAt}</td>
                           <td className="mono">{batch.targetDate}</td>
                           <td>
@@ -345,6 +463,22 @@ const styles = {
     cursor: 'pointer',
     padding: '4px',
     borderRadius: '4px',
+  },
+  batchItemsList: {
+    backgroundColor: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+    fontSize: '13px',
+  },
+  batchItemRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    color: '#334155',
   },
   batchMeta: {
     display: 'flex',

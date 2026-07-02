@@ -52,11 +52,11 @@ export const Dashboard: React.FC = () => {
 
   // 8. Production stages distribution
   const stageNames: Record<string, string> = {
-    cutting: 'Cắt / Nguyên liệu',
-    sewing: 'Gia công / May',
-    finishing: 'Hoàn thiện',
-    qc: 'Kiểm phẩm (QC)',
-    ready: 'Đóng gói & Nhập kho',
+    ordered: 'Đã đặt hàng',
+    paid: 'Đã thanh toán',
+    shipping: 'Đang vận chuyển',
+    producing: 'Đang sản xuất',
+    delivered: 'Đã nhập kho',
   };
 
   const activeBatches = productionBatches.filter((b) => b.status === 'running');
@@ -68,13 +68,20 @@ export const Dashboard: React.FC = () => {
       date: s.saleDate,
       source: s.source === 'shopee' ? 'Shopee' : s.source === 'tiktok' ? 'TikTok' : s.source === 'offline' ? 'Lên ngoài' : s.source === 'manual' ? 'Nhập tay' : 'Nhanh.vn',
     })),
-    ...productionBatches.map((b) => ({
-      type: 'production',
-      title: `Lô sản xuất ${b.id} (${products.find(p => p.sku === b.productSku)?.name || b.productSku})`,
-      value: `Công đoạn: ${stageNames[b.currentStage]} (${b.quantity} SP)`,
-      date: b.createdAt,
-      source: b.status === 'completed' ? 'Hoàn thành' : 'Đang chạy',
-    })),
+    ...productionBatches.map((b) => {
+      const itemsDesc = b.items.map((i) => {
+        const prod = products.find(p => p.sku === i.productSku);
+        return `${prod?.name || i.productSku} (x${i.quantity})`;
+      }).join(', ');
+      const totalQty = b.items.reduce((sum, i) => sum + i.quantity, 0);
+      return {
+        type: 'production',
+        title: `Lô sản xuất ${b.id} (${itemsDesc})`,
+        value: `Công đoạn: ${stageNames[b.currentStage] || b.currentStage} (${totalQty} SP)`,
+        date: b.createdAt,
+        source: b.status === 'completed' ? 'Hoàn thành' : 'Đang chạy',
+      };
+    }),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
 
   return (
@@ -394,22 +401,27 @@ export const Dashboard: React.FC = () => {
             ) : (
               <div style={styles.activeBatchesList}>
                 {activeBatches.slice(0, 3).map((batch) => {
-                  const prod = products.find(p => p.sku === batch.productSku);
                   const stageWidths: Record<string, string> = {
-                    cutting: '20%',
-                    sewing: '40%',
-                    finishing: '60%',
-                    qc: '80%',
+                    ordered: '20%',
+                    paid: '40%',
+                    shipping: '60%',
+                    producing: '80%',
+                    delivered: '100%',
                   };
+                  const itemsDesc = batch.items.map((i) => {
+                    const prod = products.find(p => p.sku === i.productSku);
+                    return `${prod?.name || i.productSku} (x${i.quantity})`;
+                  }).join(', ');
+                  const totalQty = batch.items.reduce((sum, i) => sum + i.quantity, 0);
 
                   return (
                     <div key={batch.id} style={styles.batchCompactCard}>
                       <div style={styles.batchCompactHeader}>
                         <span className="mono" style={styles.batchCompactId}>{batch.id}</span>
-                        <span className="badge badge-warning">{stageNames[batch.currentStage]}</span>
+                        <span className="badge badge-warning">{stageNames[batch.currentStage] || batch.currentStage}</span>
                       </div>
-                      <div style={styles.batchCompactTitle}>
-                        {prod?.name || batch.productSku} ({batch.quantity} sản phẩm)
+                      <div style={styles.batchCompactTitle} title={itemsDesc}>
+                        {itemsDesc.length > 50 ? `${itemsDesc.slice(0, 50)}...` : itemsDesc} ({totalQty} sản phẩm)
                       </div>
                       <div style={styles.progressBarBg}>
                         <div style={{ ...styles.progressBarFill, width: stageWidths[batch.currentStage] || '0%' }}></div>

@@ -9,12 +9,21 @@ export interface Product {
   defaultPrice: number;
 }
 
-export type ProductionStage = 'cutting' | 'sewing' | 'finishing' | 'qc' | 'ready';
+export type ProductionStage = 'ordered' | 'paid' | 'shipping' | 'producing' | 'delivered';
+
+export interface ProductionBatchItem {
+  productSku: string;
+  quantity: number;
+}
 
 export interface ProductionBatch {
   id: string;
-  productSku: string;
-  quantity: number;
+  /** Danh sách sản phẩm (SKU + số lượng) trong lệnh sản xuất này */
+  items: ProductionBatchItem[];
+  /** @deprecated Dùng items[0].productSku — chỉ giữ để tương thích với dữ liệu cũ */
+  productSku?: string;
+  /** @deprecated Dùng items[0].quantity — chỉ giữ để tương thích với dữ liệu cũ */
+  quantity?: number;
   currentStage: ProductionStage;
   status: 'running' | 'completed';
   targetDate: string;
@@ -75,7 +84,7 @@ export interface AppContextType {
     invalid: string[];
   };
   deleteProduct: (sku: string) => void;
-  createProductionBatch: (batch: { productSku: string; quantity: number; targetDate: string }) => void;
+  createProductionBatch: (batch: { items: ProductionBatchItem[]; targetDate: string }) => void;
   advanceBatchStage: (batchId: string) => void;
   deleteProductionBatch: (batchId: string) => void;
   addSale: (sale: Omit<Sale, 'id' | 'saleDate'>) => void;

@@ -168,7 +168,7 @@ export const Products: React.FC = () => {
 
   const handleDelete = (skuToDelete: string) => {
     // Check if product is referenced in production or sales
-    const isUsedInProduction = productionBatches.some((b) => b.productSku === skuToDelete);
+    const isUsedInProduction = productionBatches.some((b) => b.items.some((item) => item.productSku === skuToDelete));
     const isUsedInSales = sales.some((s) => s.productSku === skuToDelete);
 
     if (isUsedInProduction || isUsedInSales) {
@@ -389,8 +389,11 @@ export const Products: React.FC = () => {
 
                     // Tính tồn kho khả dụng = Tổng số lượng của lô đã xong (ready) - Tổng số lượng đã bán
                     const totalReady = productionBatches
-                      .filter(b => b.productSku === prod.sku && b.status === 'completed')
-                      .reduce((sum, b) => sum + b.quantity, 0);
+                      .filter(b => b.status === 'completed')
+                      .reduce((sum, b) => {
+                        const itemQty = b.items.filter(i => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
+                        return sum + itemQty;
+                      }, 0);
                     const totalSold = sales
                       .filter(s => s.productSku === prod.sku)
                       .reduce((sum, s) => sum + s.quantity, 0);

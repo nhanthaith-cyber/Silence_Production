@@ -9,6 +9,7 @@ import { Expenses } from './pages/Expenses';
 import { Inventory } from './pages/Inventory';
 import { Products } from './pages/Products';
 import { Settings } from './pages/Settings';
+import { Forecast } from './pages/Forecast';
 import { AIAssistant } from './components/AIAssistant';
 import { Login } from './components/Login';
 import type { User } from './types';
@@ -51,6 +52,7 @@ const MainAppContent: React.FC = () => {
       inventory: 'Tồn kho — Silence Production',
       products: 'Sản phẩm — Silence Production',
       ai: 'Trợ lý AI — Silence Production',
+      forecast: 'Dự kiến gọi hàng — Silence Production',
       settings: 'Cài đặt — Silence Production',
     };
     document.title = titles[currentPage] || 'Silence Production';
@@ -89,6 +91,8 @@ const MainAppContent: React.FC = () => {
         return 'Danh mục sản phẩm xưởng';
       case 'ai':
         return 'Trợ lý AI sản xuất';
+      case 'forecast':
+        return 'Dự kiến gọi hàng';
       case 'settings':
         return 'Cài đặt hệ thống';
       default:
@@ -110,6 +114,8 @@ const MainAppContent: React.FC = () => {
         return <Products />;
       case 'ai':
         return <AIAssistant />;
+      case 'forecast':
+        return <Forecast />;
       case 'settings':
         return <Settings />;
       default:

@@ -21,8 +21,11 @@ export const buildProductionPrompt = (
   // Tính tồn kho theo từng SKU
   const stockMap = products.map(p => {
     const produced = batches
-      .filter(b => b.productSku === p.sku && b.status === 'completed')
-      .reduce((s, b) => s + b.quantity, 0);
+      .filter(b => b.status === 'completed')
+      .reduce((s, b) => {
+        const itemQty = b.items.filter(i => i.productSku === p.sku).reduce((sum, i) => sum + i.quantity, 0);
+        return s + itemQty;
+      }, 0);
     const sold = sales
       .filter(s => s.productSku === p.sku)
       .reduce((s, sl) => s + sl.quantity, 0);
@@ -52,7 +55,11 @@ ${stockMap.map(p =>
 
 🏭 SẢN XUẤT:
   Đang chạy: ${runningBatches.length} lô
-${runningBatches.map(b => `  • ${b.id}: ${b.productSku} | Công đoạn: ${b.currentStage} | SL: ${b.quantity} | Hạn: ${b.targetDate}`).join('\n') || '  (Không có)'}
+${runningBatches.map(b => {
+  const itemsDesc = b.items.map(i => `${i.productSku} (x${i.quantity})`).join(', ');
+  const totalQty = b.items.reduce((s, i) => s + i.quantity, 0);
+  return `  • ${b.id}: ${itemsDesc} | Công đoạn: ${b.currentStage} | Tổng SL: ${totalQty} | Hạn: ${b.targetDate}`;
+}).join('\n') || '  (Không có)'}
   Đã hoàn thành: ${completedBatches.length} lô
 
 💰 TÀI CHÍNH:
