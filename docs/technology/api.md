@@ -31,21 +31,39 @@ Tất cả các hành động tương tác dữ liệu được quản lý tập
 
 ---
 
-### 3. Đồng bộ hóa Kênh bán lẻ (Nhanh.vn API Integration)
+### 3. Đồng bộ hóa Kênh bán lẻ (Nhanh.vn API Integration v3.0)
 
 Ứng dụng hỗ trợ kết nối trực tiếp với cổng API Nhanh.vn (v3.0) để đồng bộ sản phẩm, tồn kho và đơn hàng thực tế từ các kênh Shopee, TikTok, Website, Lazada và Offline.
 
+#### Quy cách gọi API v3.0
+
+Mọi API endpoint đều tuân theo format:
+- **URL**: `https://pos.open.nhanh.vn/v3.0/{resource}/{action}?appId={appId}&businessId={businessId}`
+- **Method**: `POST`
+- **Headers**:
+  - `Authorization`: `{accessToken}`
+  - `Content-Type`: `application/json`
+- **Body**: JSON với cấu trúc `{ filters: {...}, paginator: { size: N, next: {...} } }`
+
 #### 🔸 `syncSalesFromNhanh()`
-- **Logic:** Gửi yêu cầu POST tới `/v3.0/order/list` của Nhanh.vn để tải đơn hàng phát sinh trong ngày.
-- **Phân loại nguồn:** Đơn hàng được tự động phân loại theo kênh bán hàng (`shopee`, `tiktok`, `offline`, `nhanh_vn`) dựa trên trường `fromChannel` của Nhanh.vn.
-- **Tác động:** Tăng doanh thu tương ứng trên Dashboard, đồng thời cập nhật nhật ký hoạt động.
+- **Endpoint:** `POST /v3.0/order/list?appId=...&businessId=...`
+- **Body:** `{ filters: { createdAtFrom: timestamp, createdAtTo: timestamp }, paginator: { size: 100 } }`
+- **Phân loại nguồn:** Đơn hàng được tự động phân loại theo kênh bán hàng (`shopee`, `tiktok`, `offline`, `nhanh_vn`) dựa trên trường `fromChannel`.
+- **Phân trang:** Sử dụng cursor-based pagination qua `paginator.next`, tối đa 100 đơn/trang.
+- **Giới hạn:** Chỉ hỗ trợ lọc trong khoảng 31 ngày.
 
 #### 🔸 `syncStockFromNhanh()`
-- **Logic:** Gửi yêu cầu POST tới `/v3.0/product/list` của Nhanh.vn để tải thông tin sản phẩm và tồn kho.
-- **Tác động:** Đồng bộ tên sản phẩm, mã SKU, giá bán đề xuất và tồn kho ban đầu về cơ sở dữ liệu local.
+- **Endpoint:** `POST /v3.0/product/list?appId=...&businessId=...`
+- **Body:** `{ filters: { status: [1] }, paginator: { size: 100 } }`
+- **Tác động:** Đồng bộ tên sản phẩm, mã SKU, giá bán và tồn kho về cơ sở dữ liệu local.
+- **Phân trang:** Cursor-based, tối đa 10 trang (1000 sản phẩm).
+
+#### 🔸 `fetchNhanhInventory()`
+- **Endpoint:** `POST /v3.0/product/inventory?appId=...&businessId=...`
+- **Mục đích:** Lấy tồn kho chuyên dụng (nhẹ hơn product/list).
 
 #### 🔸 `syncStockToNhanh(sku: string)`
-- **Logic:** Gửi yêu cầu POST tới `/v3.0/product/update` để cập nhật tồn kho khả dụng từ xưởng Silence Production lên hệ thống Nhanh.vn.
+- **Lưu ý:** API v3.0 không hỗ trợ trực tiếp push tồn kho từ bên ngoài. Nhanh.vn khuyến nghị dùng Webhooks. Hàm này giữ lại để tương thích giao diện.
 
 ---
 
@@ -75,5 +93,5 @@ https://pos.open.nhanh.vn/v3.0/app/getaccesstoken?appId={appId}
 #### Giải quyết giới hạn CORS trong trình duyệt:
 - **Môi trường Development:** Sử dụng Vite proxy `/nhanh-v3` trỏ tới `https://pos.open.nhanh.vn`.
 - **Môi trường Production (GitHub Pages):** Định tuyến yêu cầu qua cổng CORS Proxy của `corsproxy.io`:
-  `https://corsproxy.io/?url=https://pos.open.nhanh.vn/v3.0/app/getaccesstoken?appId={appId}`
+  `https://corsproxy.io/?url=https://pos.open.nhanh.vn/v3.0/...`
   để vượt qua chính sách CORS của trình duyệt mà không cần sử dụng máy chủ backend riêng biệt.

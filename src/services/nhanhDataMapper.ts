@@ -14,12 +14,13 @@ export const mapNhanhProductToLocal = (
   nhanhProduct: NhanhProductStock,
   existingProduct?: Product
 ): Product => ({
-  sku: nhanhProduct.sku.toUpperCase(),
+  sku: nhanhProduct.sku.toUpperCase().trim(),
   name: nhanhProduct.name,
   // Giữ nguyên giá vốn nếu đã có, vì user quản lý giá vốn trực tiếp trên web
   defaultCost: existingProduct?.defaultCost || 0,
   // Cập nhật giá bán từ Nhanh.vn
   defaultPrice: nhanhProduct.price || existingProduct?.defaultPrice || 0,
+  nhanhStock: nhanhProduct.stock,
 });
 
 /**
@@ -29,7 +30,7 @@ export const mapNhanhProductToLocal = (
 export const mapNhanhOrderToSale = (nhanhOrder: NhanhOrder): Sale[] => {
   return nhanhOrder.products.map((p, index) => ({
     id: `${nhanhOrder.id}${index > 0 ? `-${index}` : ''}`,
-    productSku: p.sku.toUpperCase(),
+    productSku: p.sku.toUpperCase().trim(),
     quantity: p.quantity,
     unitPrice: p.price,
     saleDate: nhanhOrder.createdAt.split(' ')[0] || new Date().toISOString().split('T')[0],
@@ -65,11 +66,11 @@ export const calculateSyncDiff = (
   // Tìm sản phẩm mới và cần cập nhật
   nhanhProducts.forEach((np) => {
     const existing = localProducts.find(
-      (lp) => lp.sku.toUpperCase() === np.sku.toUpperCase()
+      (lp) => lp.sku.toUpperCase().trim() === np.sku.toUpperCase().trim()
     );
     if (!existing) {
       newProducts.push(np);
-    } else if (existing.defaultPrice !== np.price || existing.name !== np.name) {
+    } else if (existing.defaultPrice !== np.price || existing.name !== np.name || existing.nhanhStock !== np.stock) {
       updatedProducts.push({ nhanh: np, local: existing });
     }
   });
@@ -77,7 +78,7 @@ export const calculateSyncDiff = (
   // Tìm sản phẩm chỉ có ở local (không có trên Nhanh.vn)
   localProducts.forEach((lp) => {
     const onNhanh = nhanhProducts.find(
-      (np) => np.sku.toUpperCase() === lp.sku.toUpperCase()
+      (np) => np.sku.toUpperCase().trim() === lp.sku.toUpperCase().trim()
     );
     if (!onNhanh) {
       localOnly.push(lp);
@@ -88,7 +89,7 @@ export const calculateSyncDiff = (
 };
 
 /**
- * Merge dữ liệu sản phẩm: giữ giá vốn từ local, cập nhật tên + giá bán từ Nhanh.vn
+ * Merge dữ liệu sản phẩm: giữ giá vốn từ local, cập nhật tên + giá bán + tồn kho từ Nhanh.vn
  */
 export const mergeProductData = (
   nhanhProducts: NhanhProductStock[],
@@ -99,13 +100,14 @@ export const mergeProductData = (
   // Cập nhật các sản phẩm đã có bằng dữ liệu Nhanh.vn
   localProducts.forEach((local) => {
     const nhanhMatch = nhanhProducts.find(
-      (np) => np.sku.toUpperCase() === local.sku.toUpperCase()
+      (np) => np.sku.toUpperCase().trim() === local.sku.toUpperCase().trim()
     );
     if (nhanhMatch) {
       merged.push({
         ...local,
         name: nhanhMatch.name || local.name,
         defaultPrice: nhanhMatch.price || local.defaultPrice,
+        nhanhStock: nhanhMatch.stock,
         // Giữ nguyên defaultCost — user quản lý trực tiếp
       });
     } else {
@@ -116,7 +118,7 @@ export const mergeProductData = (
   // Thêm sản phẩm mới từ Nhanh.vn chưa có ở local
   nhanhProducts.forEach((np) => {
     const exists = localProducts.find(
-      (lp) => lp.sku.toUpperCase() === np.sku.toUpperCase()
+      (lp) => lp.sku.toUpperCase().trim() === np.sku.toUpperCase().trim()
     );
     if (!exists) {
       merged.push(mapNhanhProductToLocal(np));

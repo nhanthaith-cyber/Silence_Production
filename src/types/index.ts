@@ -7,6 +7,7 @@ export interface Product {
   name: string;
   defaultCost: number;
   defaultPrice: number;
+  nhanhStock?: number;
 }
 
 export type ProductionStage = 'ordered' | 'paid' | 'shipping' | 'producing' | 'delivered';

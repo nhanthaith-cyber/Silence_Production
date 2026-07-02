@@ -6,7 +6,7 @@ import type {
 import { defaultProducts, defaultBatches, defaultSales, defaultExpenses } from '../data/defaultData';
 import { getTodayISO, generateId } from '../utils/formatters';
 import { fetchNhanhStock, fetchNhanhOrders, updateNhanhStock, checkNhanhConnection } from '../services/nhanhService';
-import { mapNhanhOrderToSale, mergeProductData, filterNewOrders } from '../services/nhanhDataMapper';
+import { mapNhanhOrderToSale, mergeProductData } from '../services/nhanhDataMapper';
 import { exportAllData as exportData, parseImportData } from '../services/productionDataService';
 
 // Export context để hook useApp có thể truy cập
@@ -105,6 +105,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setConnectionStatus(result.connected ? 'connected' : 'sandbox');
     });
   }, []);
+
+  // Tự động đồng bộ ngầm định kỳ (Auto-Polling) mỗi 5 phút một lần
+  useEffect(() => {
+    // Chỉ tự động đồng bộ khi ở chế độ Live và đã kết nối thành công
+    if (connectionStatus !== 'connected' || apiMode !== 'live') return;
+
+    // Trì hoãn 3 giây trước khi chạy lượt đồng bộ ngầm đầu tiên (tránh làm chậm ứng dụng khi vừa tải trang)
+    const initialTimer = setTimeout(() => {
+      console.log('[Auto-Sync] Bắt đầu tự động đồng bộ lần đầu...');
+      syncSalesFromNhanh().catch(err => console.warn('[Auto-Sync Sales Error]', err));
+      syncStockFromNhanh().catch(err => console.warn('[Auto-Sync Stock Error]', err));
+    }, 3000);
+
+    // Đồng bộ định kỳ mỗi 5 phút
+    const intervalTime = 5 * 60 * 1000;
+    const interval = setInterval(() => {
+      console.log('[Auto-Sync] Chạy đồng bộ định kỳ...');
+      syncSalesFromNhanh().catch(err => console.warn('[Auto-Sync Sales Error]', err));
+      syncStockFromNhanh().catch(err => console.warn('[Auto-Sync Stock Error]', err));
+    }, intervalTime);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionStatus, apiMode]);
 
   // Save changes helper
   const saveToLocal = (key: string, data: unknown) => {
@@ -279,31 +306,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return 0;
       }
 
-      const newOrders = filterNewOrders(nhanhOrders, sales);
-      if (newOrders.length === 0) {
-        addSyncLog('Nhanh.vn', 'Đồng bộ đơn hàng', 'success', 'Không có đơn hàng mới (tất cả đã đồng bộ).');
-        return 0;
+      // Trạng thái đơn hàng không tính vào doanh thu bán hàng (Hủy, Thất bại, Trả hàng)
+      const cancelStatuses = ['canceled', 'failed', 'returned', 'returning', 'aborted', 'cancel'];
+
+      let addedCount = 0;
+      let removedCount = 0;
+      let updatedCount = 0;
+
+      setSales((prevSales) => {
+        let currentSales = [...prevSales];
+
+        nhanhOrders.forEach((order) => {
+          const isCanceled = cancelStatuses.includes(order.status.toLowerCase());
+          const orderIdStr = String(order.id);
+
+          // Tìm đơn hàng local liên quan đến orderId này (hỗ trợ đơn nhiều sản phẩm bị tách dòng)
+          const relatedSales = currentSales.filter(
+            (s) => s.id === orderIdStr || s.id.startsWith(orderIdStr + '-')
+          );
+          const exists = relatedSales.length > 0;
+
+          if (isCanceled) {
+            // Nếu đơn hàng bị hủy hoặc chuyển hoàn -> Xóa khỏi doanh số local
+            if (exists) {
+              currentSales = currentSales.filter(
+                (s) => s.id !== orderIdStr && !s.id.startsWith(orderIdStr + '-')
+              );
+              removedCount += relatedSales.length;
+            }
+          } else {
+            const mappedSales = mapNhanhOrderToSale(order);
+
+            if (!exists) {
+              // Chưa có ở local -> Thêm mới
+              currentSales = [...mappedSales, ...currentSales];
+              addedCount += mappedSales.length;
+            } else {
+              // Đã có ở local -> Cập nhật thông tin mới nhất bằng cách ghi đè
+              currentSales = currentSales.filter(
+                (s) => s.id !== orderIdStr && !s.id.startsWith(orderIdStr + '-')
+              );
+              currentSales = [...mappedSales, ...currentSales];
+              updatedCount += mappedSales.length;
+            }
+          }
+        });
+
+        saveToLocal('silence_prod_sales', currentSales);
+        return currentSales;
+      });
+
+      // Tạo thông điệp log chi tiết
+      let logMsg = `Đồng bộ hoàn tất: `;
+      const parts: string[] = [];
+      if (addedCount > 0) parts.push(`thêm mới ${addedCount} đơn`);
+      if (removedCount > 0) parts.push(`hủy bỏ ${removedCount} đơn (do hủy/trả trên Nhanh)`);
+      if (updatedCount > 0) parts.push(`cập nhật ${updatedCount} đơn`);
+      
+      if (parts.length > 0) {
+        logMsg += parts.join(', ') + '.';
+      } else {
+        logMsg += 'không có thay đổi nào.';
       }
 
-      const newSales: Sale[] = [];
-      newOrders.forEach((order) => {
-        const mapped = mapNhanhOrderToSale(order);
-        newSales.push(...mapped);
-      });
-
-      setSales((prev) => {
-        const updated = [...newSales, ...prev];
-        saveToLocal('silence_prod_sales', updated);
-        return updated;
-      });
-
-      addSyncLog('Nhanh.vn', 'Đồng bộ đơn hàng', connectionStatus === 'connected' ? 'success' : 'sandbox',
-        `Đã nhận ${newSales.length} đơn hàng mới từ ${newOrders.length} order.`);
-      return newSales.length;
+      addSyncLog('Nhanh.vn', 'Đồng bộ đơn hàng', connectionStatus === 'connected' ? 'success' : 'sandbox', logMsg);
+      return addedCount;
     } catch (e) {
       console.error('Lỗi syncSalesFromNhanh:', e);
       addSyncLog('Nhanh.vn', 'Đồng bộ đơn hàng', 'error', `Lỗi: ${(e as Error).message}`);
-      return 0;
+      throw e;
     }
   };
 
@@ -332,7 +403,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.error('Lỗi syncStockFromNhanh:', e);
       addSyncLog('Nhanh.vn', 'Nhận tồn kho', 'error', `Lỗi: ${(e as Error).message}`);
-      return 0;
+      throw e;
     }
   };
 
@@ -357,6 +428,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         success
           ? `Đã đẩy SKU ${sku}: ${availableStock} cái lên Nhanh.vn.`
           : `Lỗi đẩy SKU ${sku}.`);
+
+      if (success) {
+        setProducts((prev) => {
+          const updated = prev.map((p) => p.sku === sku ? { ...p, nhanhStock: availableStock } : p);
+          saveToLocal('silence_prod_products', updated);
+          return updated;
+        });
+      }
+
       return success;
     } catch (e) {
       console.error('Lỗi syncStockToNhanh:', e);

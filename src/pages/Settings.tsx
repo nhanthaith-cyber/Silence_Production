@@ -12,10 +12,10 @@ export const Settings: React.FC = () => {
   } = useApp();
 
   // Form state cho API credentials
-  const [appId, setAppId] = useState(localStorage.getItem('silence_nhanh_app_id') || '');
-  const [businessId, setBusinessId] = useState(localStorage.getItem('silence_nhanh_business_id') || '');
-  const [accessToken, setAccessToken] = useState(localStorage.getItem('silence_nhanh_access_token') || '');
-  const [secretKey, setSecretKey] = useState(localStorage.getItem('silence_nhanh_secret_key') || '');
+  const [appId, setAppId] = useState(localStorage.getItem('silence_nhanh_app_id') || import.meta.env.VITE_NHANH_APP_ID || '');
+  const [businessId, setBusinessId] = useState(localStorage.getItem('silence_nhanh_business_id') || import.meta.env.VITE_NHANH_BUSINESS_ID || '');
+  const [accessToken, setAccessToken] = useState(localStorage.getItem('silence_nhanh_access_token') || import.meta.env.VITE_NHANH_ACCESS_TOKEN || '');
+  const [secretKey, setSecretKey] = useState(localStorage.getItem('silence_nhanh_secret_key') || import.meta.env.VITE_NHANH_SECRET_KEY || '');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -84,7 +84,10 @@ export const Settings: React.FC = () => {
             setBusinessId(String(bizId));
             localStorage.setItem('silence_nhanh_business_id', String(bizId));
           }
-          setOauthStatus({ type: 'success', msg: '✅ Lấy Access Token thành công! Đã lưu vào hệ thống.' });
+          // Tự động chuyển sang mode Live sau khi OAuth thành công
+          localStorage.setItem('silence_nhanh_api_mode', 'live');
+          setApiMode('live');
+          setOauthStatus({ type: 'success', msg: '✅ Lấy Access Token thành công! Đã lưu và chuyển sang chế độ Live.' });
         } else {
           throw new Error('Không tìm thấy accessToken trong dữ liệu trả về.');
         }
@@ -120,6 +123,16 @@ export const Settings: React.FC = () => {
       setOauthStatus({ type: 'error', msg: 'Vui lòng nhập App ID trước.' });
       return;
     }
+
+    // Nhanh.vn yêu cầu redirect URI phải là HTTPS
+    if (window.location.protocol !== 'https:') {
+      setOauthStatus({
+        type: 'error',
+        msg: '⚠️ Nhanh.vn yêu cầu HTTPS cho OAuth. Vui lòng thực hiện OAuth trên trang GitHub Pages (https://nhanthaith-cyber.github.io/Silence_Production/) rồi quay lại đây.',
+      });
+      return;
+    }
+
     // Lưu App ID và Secret Key
     localStorage.setItem('silence_nhanh_app_id', id);
     if (secretKey.trim()) localStorage.setItem('silence_nhanh_secret_key', secretKey.trim());
@@ -137,20 +150,44 @@ export const Settings: React.FC = () => {
     localStorage.setItem('silence_nhanh_app_id', appId.trim());
     localStorage.setItem('silence_nhanh_business_id', businessId.trim());
     localStorage.setItem('silence_nhanh_access_token', accessToken.trim());
+    if (secretKey.trim()) {
+      localStorage.setItem('silence_nhanh_secret_key', secretKey.trim());
+    }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
   // Test kết nối
   const handleTestConnection = async () => {
+    // Lưu credentials trước
     handleSaveCredentials();
+    // Đảm bảo mode là Live khi test
+    if (apiMode !== 'live') {
+      localStorage.setItem('silence_nhanh_api_mode', 'live');
+      setApiMode('live');
+    }
     setIsTesting(true);
     setTestResult(null);
+
+    // Debug: log credentials để kiểm tra
+    const debugAppId = localStorage.getItem('silence_nhanh_app_id');
+    const debugBizId = localStorage.getItem('silence_nhanh_business_id');
+    const debugToken = localStorage.getItem('silence_nhanh_access_token');
+    const debugMode = localStorage.getItem('silence_nhanh_api_mode');
+    console.log('[DEBUG] Test kết nối:', {
+      appId: debugAppId,
+      businessId: debugBizId,
+      hasToken: !!debugToken && debugToken.length > 0,
+      tokenLength: debugToken?.length || 0,
+      mode: debugMode,
+    });
 
     const ok = await checkConnection();
     setTestResult({
       ok,
-      msg: ok ? 'Kết nối API Nhanh.vn thành công!' : 'Không thể kết nối. Kiểm tra lại API key và quyền truy cập.',
+      msg: ok
+        ? 'Kết nối API Nhanh.vn thành công!'
+        : `Không thể kết nối. Mode: ${debugMode}, AppID: ${debugAppId || '(trống)'}, BizID: ${debugBizId || '(trống)'}, Token: ${debugToken ? `${debugToken.length} ký tự` : '(trống)'}`,
     });
     setIsTesting(false);
   };

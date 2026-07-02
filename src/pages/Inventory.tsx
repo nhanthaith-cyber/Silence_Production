@@ -32,8 +32,10 @@ export const Inventory: React.FC = () => {
       .filter((s) => s.productSku === prod.sku)
       .reduce((sum, s) => sum + s.quantity, 0);
 
-    // 4. Available = Total Produced - Sold
-    const available = totalProduced - sold;
+    // 4. Available = Tồn kho thực tế
+    // Ưu tiên dùng số lượng nhanhStock đồng bộ từ Nhanh.vn (nếu có).
+    // Nếu chưa đồng bộ, dùng công thức nội bộ = Tổng sản xuất xong - Đã bán lẻ.
+    const available = prod.nhanhStock !== undefined ? prod.nhanhStock : (totalProduced - sold);
 
     return {
       sku: prod.sku,

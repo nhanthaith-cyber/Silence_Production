@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../hooks/useApp';
 import type { ExpenseCategory } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { RefreshCw, Plus, Check } from 'lucide-react';
+import { RefreshCw, Plus, Check, AlertCircle } from 'lucide-react';
 
 export const Expenses: React.FC = () => {
   const { products, expenses, sales, addExpense, syncSalesFromNhanh, syncStockFromNhanh, connectionStatus } = useApp();
@@ -52,7 +52,11 @@ export const Expenses: React.FC = () => {
       });
     } catch (err) {
       console.error(err);
-      setSyncStatus({ qty: 0, success: false });
+      setSyncStatus({
+        qty: 0,
+        success: false,
+        extraInfo: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setIsSyncing(false);
     }
@@ -180,11 +184,17 @@ export const Expenses: React.FC = () => {
             </button>
 
             {syncStatus && (
-              <div style={syncStatus.qty > 0 ? styles.syncSuccessBox : styles.syncEmptyBox}>
-                <Check size={16} style={{ color: syncStatus.qty > 0 ? '#006c49' : '#b45309', flexShrink: 0 }} />
+              <div style={!syncStatus.success ? styles.syncErrorBox : (syncStatus.qty > 0 ? styles.syncSuccessBox : styles.syncEmptyBox)}>
+                {!syncStatus.success ? (
+                  <AlertCircle size={16} style={{ color: '#ba1a1a', flexShrink: 0, marginTop: '2px' }} />
+                ) : (
+                  <Check size={16} style={{ color: syncStatus.qty > 0 ? '#006c49' : '#b45309', flexShrink: 0, marginTop: '2px' }} />
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <span>
-                    {syncStatus.qty > 0
+                    {!syncStatus.success
+                      ? 'Lỗi đồng bộ API Nhanh.vn!'
+                      : syncStatus.qty > 0
                       ? `Đồng bộ thành công: Tải về ${syncStatus.qty} đơn hàng mới.`
                       : `Không có đơn hàng mới (hoặc tất cả đã được đồng bộ trước đó).`}
                   </span>
@@ -363,6 +373,20 @@ const styles = {
     gap: '8px',
     lineHeight: 1.4,
     border: '1px solid #fcd34d',
+    marginTop: '8px',
+  },
+  syncErrorBox: {
+    padding: '12px',
+    backgroundColor: '#ffdad6',
+    color: '#ba1a1a',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: 500,
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '8px',
+    lineHeight: 1.4,
+    border: '1px solid #ffb4ab',
     marginTop: '8px',
   },
 };
