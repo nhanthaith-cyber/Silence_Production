@@ -213,7 +213,7 @@ export const fetchNhanhStock = async (): Promise<NhanhProductStock[]> => {
     const allProducts: NhanhProductStock[] = [];
     let nextCursor: Record<string, unknown> | null = null;
     let pageCount = 0;
-    const maxPages = 10; // Giới hạn tối đa 10 trang (1000 SP)
+    const maxPages = 30; // Giới hạn tối đa 30 trang (3000 SP)
 
     do {
       const paginator: Record<string, unknown> = { size: 100 };
