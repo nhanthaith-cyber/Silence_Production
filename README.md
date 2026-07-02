@@ -41,13 +41,17 @@ your-project/
 ├── README.md                   📖 Giới thiệu dự án (cho người)
 │
 ├── docs/                       📋 Thư mục chứa tài liệu đặc tả dự án
-│   ├── requirement.md          📋 Yêu cầu chức năng
-│   ├── architecture.md         🏗️ Kiến trúc hệ thống
-│   ├── conventions.md          📐 Quy ước code
-│   ├── api.md                  🔌 Tài liệu API
-│   └── database.md             🗄️ Schema database
+│   ├── requirement/            📋 Yêu cầu chức năng
+│   │   └── requirement.md
+│   ├── flow/                   🏗️ Kiến trúc hệ thống & luồng dữ liệu
+│   │   └── architecture.md
+│   ├── technology/             📐 Quy ước, API & Database
+│   │   ├── conventions.md
+│   │   ├── api.md
+│   │   └── database.md
+│   └── template/               🎨 Mẫu thiết kế UI/UX các phân hệ
 │
-└── src/                        🛠️ Mã nguồn chính (sẽ được tạo sau)
+└── src/                        🛠️ Mã nguồn chính ứng dụng React/Vite
 ```
 
 ---
@@ -55,11 +59,11 @@ your-project/
 ## 📐 Quy ước và Tài liệu
 
 Để tìm hiểu chi tiết hơn về dự án, vui lòng đọc các tài liệu sau trong thư mục `/docs`:
-- **Đặc tả yêu cầu:** Xem [requirement.md](docs/requirement.md) để biết các chức năng cần phát triển.
-- **Kiến trúc hệ thống:** Xem [architecture.md](docs/architecture.md) để hiểu cách hệ thống vận hành.
-- **Quy chuẩn lập trình:** Xem [conventions.md](docs/conventions.md) để viết code đúng chuẩn của dự án.
-- **Tài liệu API:** Xem [api.md](docs/api.md) để tích hợp các cổng kết nối API.
-- **Cơ sở dữ liệu:** Xem [database.md](docs/database.md) để nắm thông tin về schema cơ sở dữ liệu.
+- **Đặc tả yêu cầu:** Xem [requirement.md](docs/requirement/requirement.md) để biết các chức năng cần phát triển.
+- **Kiến trúc hệ thống:** Xem [architecture.md](docs/flow/architecture.md) để hiểu cách hệ thống vận hành.
+- **Quy chuẩn lập trình:** Xem [conventions.md](docs/technology/conventions.md) để viết code đúng chuẩn của dự án.
+- **Tài liệu API:** Xem [api.md](docs/technology/api.md) để tích hợp các cổng kết nối API.
+- **Cơ sở dữ liệu:** Xem [database.md](docs/technology/database.md) để nắm thông tin về schema cơ sở dữ liệu.
 
 ---
 
