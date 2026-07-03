@@ -56,3 +56,5 @@ Toàn bộ dữ liệu của hệ thống được quản lý thông qua `AppCon
 3. State của lô hàng chuyển sang trạng thái mới. Đồng thời, số lượng tồn kho `Available` của sản phẩm đó được cộng thêm.
 4. Trạng thái mới được ghi đè vào `LocalStorage`.
 5. React render lại giao diện, các biểu đồ tự động cập nhật số liệu mới nhất.
+6. Tự động cập nhật kéo đơn hàng tạo từ sàn Thương mại điện từ về 
+7. tăng số lượng cập nhật tồn kho lên 3000 SKU cùng lúc

@@ -49,3 +49,5 @@ Hiển thị 3 chỉ số tổng hợp toàn hệ thống:
      - Nhãn xanh "Đủ hàng" kèm icon tích xanh nếu Khả dụng $\ge 20$.
   7. **Đồng bộ Nhanh:** Nút bấm phụ "Đẩy tồn" (nút nhỏ compact, font chữ bé, viền xám). Khi click, đẩy riêng số tồn khả dụng của SKU này lên Nhanh.vn.
 - *Trạng thái trống:* Nếu hệ thống chưa có SKU nào, hiển thị dòng thông báo "Chưa có sản phẩm nào trong hệ thống." ở giữa bảng.
+Phần sản phẩm có nhiều SKU thì dùng chế độ mở nhiều trang để xem, mỗi trang 30 SKU
+Phần sản phẩm thêm vùng để tìm kiếm SKU
