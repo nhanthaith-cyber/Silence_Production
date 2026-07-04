@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
-import type { ExpenseCategory } from '../types';
+import type { ExpenseCategory, ExcelImportResult } from '../types';
 import { formatCurrency } from '../utils/formatters';
-import { RefreshCw, Plus, Check, AlertCircle } from 'lucide-react';
+import { RefreshCw, Plus, Check, AlertCircle, FileSpreadsheet, FileDown, Upload, CheckCircle2 } from 'lucide-react';
+import {
+  exportExpensesToExcel,
+  generateExpensesTemplate,
+  exportSalesToExcel,
+  generateSalesTemplate,
+  importFromExcel
+} from '../services/excelDataService';
 
 export const Expenses: React.FC = () => {
-  const { products, expenses, sales, addExpense, syncSalesFromNhanh, syncStockFromNhanh, connectionStatus } = useApp();
+  const {
+    products, expenses, sales, addExpense, syncSalesFromNhanh, syncStockFromNhanh, connectionStatus,
+    importAllData, productionBatches
+  } = useApp();
 
   // Expense form states
   const [category, setCategory] = useState<ExpenseCategory>('other');
@@ -21,6 +31,83 @@ export const Expenses: React.FC = () => {
 
   // Sales tab
   const [salesTab, setSalesTab] = useState<'orders' | 'products'>('orders');
+
+  // Excel states
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
+  const [excelPreview, setExcelPreview] = useState<ExcelImportResult | null>(null);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const [excelSuccess, setExcelSuccess] = useState<string | null>(null);
+  const [excelImportMode, setExcelImportMode] = useState<'append' | 'overwrite'>('append');
+  const [showExcelConfirm, setShowExcelConfirm] = useState(false);
+  const [excelTarget, setExcelTarget] = useState<'sales' | 'expenses'>('expenses');
+
+  const handleExcelFileChange = async (e: React.ChangeEvent<HTMLInputElement>, target: 'sales' | 'expenses') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (excelFileInputRef.current) excelFileInputRef.current.value = '';
+    setExcelTarget(target);
+    setIsParsingExcel(true);
+    setExcelError(null);
+    setExcelPreview(null);
+    setExcelSuccess(null);
+    try {
+      const result = await importFromExcel(file);
+      setExcelPreview(result);
+      setShowExcelConfirm(true);
+    } catch (err) {
+      setExcelError((err as Error).message);
+    } finally {
+      setIsParsingExcel(false);
+    }
+  };
+
+  const handleConfirmExcelImport = () => {
+    if (!excelPreview) return;
+    
+    let finalSales = sales;
+    let finalExpenses = expenses;
+
+    if (excelTarget === 'sales') {
+      finalSales = excelImportMode === 'overwrite'
+        ? excelPreview.sales
+        : [
+            ...sales,
+            ...excelPreview.sales.filter(s => !sales.find(es => es.id === s.id))
+          ];
+    } else {
+      finalExpenses = excelImportMode === 'overwrite'
+        ? excelPreview.expenses
+        : [
+            ...expenses,
+            ...excelPreview.expenses.filter(ex => !expenses.find(ee => ee.id === ex.id))
+          ];
+    }
+
+    const jsonStr = JSON.stringify({
+      version: '1.0',
+      exportedAt: excelPreview.parsedAt,
+      products,
+      productionBatches,
+      sales: finalSales,
+      expenses: finalExpenses,
+    });
+
+    const result = importAllData(jsonStr);
+    if (result.success) {
+      const mode = excelImportMode === 'overwrite' ? 'Ghi đè' : 'Thêm mới';
+      const targetLabel = excelTarget === 'sales' ? 'đơn bán hàng' : 'chi phí';
+      const count = excelTarget === 'sales' ? excelPreview.sales.length : excelPreview.expenses.length;
+      setExcelSuccess(`✅ [${mode}] Import ${targetLabel} thành công: ${count} dòng.`);
+      setShowExcelConfirm(false);
+      setExcelPreview(null);
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      setExcelError(`Lỗi import: ${result.error}`);
+      setShowExcelConfirm(false);
+    }
+  };
+
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,6 +253,47 @@ export const Expenses: React.FC = () => {
                 <span>Ghi nhận chi phí</span>
               </button>
             </form>
+
+            <div style={{ margin: '20px 0', borderTop: '1px dashed #eceef0' }}></div>
+
+            {/* ── Sleek Excel Card for Expenses ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#091426', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileSpreadsheet size={16} color="#006c49" /> Cập nhật chi phí qua Excel
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={generateExpensesTemplate}
+                  className="btn btn-secondary"
+                  style={{ gap: '6px', fontSize: '12px', padding: '6px 8px' }}
+                >
+                  <FileDown size={12} /> Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportExpensesToExcel(expenses)}
+                  className="btn btn-secondary"
+                  style={{ gap: '6px', fontSize: '12px', padding: '6px 8px' }}
+                >
+                  <FileSpreadsheet size={12} /> Xuất Excel
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setExcelTarget('expenses');
+                  excelFileInputRef.current?.click();
+                }}
+                className="btn btn-primary"
+                disabled={isParsingExcel}
+                style={{ width: '100%', gap: '6px', fontSize: '12px', padding: '8px', backgroundColor: '#006c49', borderColor: '#006c49' }}
+              >
+                {isParsingExcel && excelTarget === 'expenses'
+                  ? <><RefreshCw size={12} className="spin-anim" /><span>Đang đọc...</span></>
+                  : <><Upload size={12} /><span>Import Excel Chi phí</span></>}
+              </button>
+            </div>
           </div>
 
           {/* Sync from Nhanh.vn */}
@@ -254,6 +382,154 @@ export const Expenses: React.FC = () => {
                       {syncStatus.extraInfo}
                     </span>
                   )}
+                </div>
+              </div>
+            )}
+
+            <div style={{ margin: '20px 0', borderTop: '1px dashed #eceef0' }}></div>
+
+            {/* ── Sleek Excel Card for Sales ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#091426', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileSpreadsheet size={16} color="#1a56db" /> Cập nhật đơn hàng qua Excel
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={generateSalesTemplate}
+                  className="btn btn-secondary"
+                  style={{ gap: '6px', fontSize: '12px', padding: '6px 8px' }}
+                >
+                  <FileDown size={12} /> Template
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportSalesToExcel(sales)}
+                  className="btn btn-secondary"
+                  style={{ gap: '6px', fontSize: '12px', padding: '6px 8px' }}
+                >
+                  <FileSpreadsheet size={12} /> Xuất Excel
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setExcelTarget('sales');
+                  excelFileInputRef.current?.click();
+                }}
+                className="btn btn-primary"
+                disabled={isParsingExcel}
+                style={{ width: '100%', gap: '6px', fontSize: '12px', padding: '8px', backgroundColor: '#1a56db', borderColor: '#1a56db' }}
+              >
+                {isParsingExcel && excelTarget === 'sales'
+                  ? <><RefreshCw size={12} className="spin-anim" /><span>Đang đọc...</span></>
+                  : <><Upload size={12} /><span>Import Excel Đơn hàng</span></>}
+              </button>
+            </div>
+
+            {excelError && (
+              <div style={{ ...styles.errorAlert, marginTop: '12px' }}>
+                <AlertCircle size={14} />
+                <span>{excelError}</span>
+              </div>
+            )}
+
+            {excelSuccess && (
+              <div style={{
+                padding: '10px 12px',
+                backgroundColor: '#e6f6ef',
+                color: '#006c49',
+                borderRadius: '4px',
+                fontSize: '13px',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginTop: '12px'
+              }}>
+                <CheckCircle2 size={14} />
+                <span>{excelSuccess}</span>
+              </div>
+            )}
+
+            <input
+              ref={excelFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(e) => handleExcelFileChange(e, excelTarget)}
+              style={{ display: 'none' }}
+            />
+
+            {/* ── Excel Confirm Modal ── */}
+            {showExcelConfirm && excelPreview && (
+              <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(9, 20, 38, 0.6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 9999, padding: '16px'
+              }}>
+                <div style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  maxWidth: '480px',
+                  width: '100%',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                  display: 'flex', flexDirection: 'column', gap: '16px'
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: '16px', color: '#091426', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid #eceef0', paddingBottom: '12px' }}>
+                    <FileSpreadsheet size={20} color={excelTarget === 'sales' ? '#1a56db' : '#006c49'} />
+                    Xác nhận import Excel {excelTarget === 'sales' ? 'đơn hàng' : 'chi phí'}
+                  </div>
+                  
+                  <div style={{ fontSize: '13px', color: '#45474c' }}>
+                    Đọc được: <strong style={{ color: '#006c49' }}>
+                      {excelTarget === 'sales' ? `${excelPreview.sales.length} đơn hàng` : `${excelPreview.expenses.length} khoản chi phí`}
+                    </strong> từ file Excel.
+                  </div>
+
+                  {excelPreview.warnings.length > 0 && (
+                    <div style={{ fontSize: '11px', color: '#b45309', background: '#fef3c7', padding: '10px', borderRadius: '6px', maxHeight: '100px', overflowY: 'auto' }}>
+                      {excelPreview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+                    </div>
+                  )}
+
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#334155' }}>Chọn chế độ import:</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <label style={{
+                        display: 'flex', gap: '8px', padding: '10px', border: `1px solid ${excelImportMode === 'overwrite' ? '#ba1a1a' : '#eceef0'}`,
+                        borderRadius: '8px', cursor: 'pointer', background: excelImportMode === 'overwrite' ? '#ffdad633' : '#f8fafc'
+                      }}>
+                        <input type="radio" name="excelTargetMode" value="overwrite"
+                          checked={excelImportMode === 'overwrite'}
+                          onChange={() => setExcelImportMode('overwrite')} />
+                        <div>
+                          <div style={{ fontWeight: 600, color: '#ba1a1a', fontSize: '12px' }}>Ghi đè</div>
+                          <div style={{ fontSize: '10px', color: '#8191a9', marginTop: '2px' }}>Xóa dữ liệu cũ</div>
+                        </div>
+                      </label>
+                      
+                      <label style={{
+                        display: 'flex', gap: '8px', padding: '10px', border: `1px solid ${excelImportMode === 'append' ? '#006c49' : '#eceef0'}`,
+                        borderRadius: '8px', cursor: 'pointer', background: excelImportMode === 'append' ? '#e6f6ef33' : '#f8fafc'
+                      }}>
+                        <input type="radio" name="excelTargetMode" value="append"
+                          checked={excelImportMode === 'append'}
+                          onChange={() => setExcelImportMode('append')} />
+                        <div>
+                          <div style={{ fontWeight: 600, color: '#006c49', fontSize: '12px' }}>Thêm mới</div>
+                          <div style={{ fontSize: '10px', color: '#8191a9', marginTop: '2px' }}>Giữ cũ, thêm dòng mới</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                    <button type="button" onClick={() => { setShowExcelConfirm(false); setExcelPreview(null); }} className="btn btn-secondary" style={{ flex: 1 }}>Hủy</button>
+                    <button type="button" onClick={handleConfirmExcelImport} className="btn btn-primary" style={{ flex: 1, backgroundColor: '#091426' }}>Xác nhận</button>
+                  </div>
                 </div>
               </div>
             )}
@@ -692,6 +968,17 @@ const styles = {
     lineHeight: 1.4,
     border: '1px solid #ffb4ab',
     marginTop: '8px',
+  },
+  errorAlert: {
+    padding: '10px 12px',
+    backgroundColor: '#ffdad6',
+    color: '#ba1a1a',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: 600,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
 };
 

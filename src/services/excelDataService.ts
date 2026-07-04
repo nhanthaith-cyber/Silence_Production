@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Excel Data Service — Đọc/ghi dữ liệu qua file Excel (.xlsx)
  *
  * Sử dụng thư viện SheetJS (xlsx) chạy hoàn toàn ở phía client.
@@ -332,3 +332,170 @@ export const importFromExcel = (file: File): Promise<ExcelImportResult> => {
     reader.readAsArrayBuffer(file);
   });
 };
+
+// ────────────────────────────────────────────────
+// PAGE-SPECIFIC EXPORT & TEMPLATE HELPERS
+// ────────────────────────────────────────────────
+
+export const exportProductsToExcel = (products: Product[]): void => {
+  const wb = XLSX.utils.book_new();
+  const productRows = products.map((p) => ({
+    SKU: p.sku,
+    'Ten san pham': p.name,
+    'Gia goc (VND)': p.defaultCost,
+    'Gia ban (VND)': p.defaultPrice,
+    'Ton kho Nhanh.vn': p.nhanhStock ?? 0,
+  }));
+  const wsProducts = XLSX.utils.json_to_sheet(productRows.length ? productRows : [
+    { SKU: '', 'Ten san pham': '', 'Gia goc (VND)': 0, 'Gia ban (VND)': 0, 'Ton kho Nhanh.vn': 0 }
+  ]);
+  wsProducts['!cols'] = [{ wch: 15 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, wsProducts, 'Products');
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  XLSX.writeFile(wb, `SilenceProduction_Products_${timestamp}.xlsx`);
+};
+
+export const generateProductsTemplate = (): void => {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet([
+    { SKU: 'AO-THUN-01', 'Ten san pham': 'Áo thun Silence Classic', 'Gia goc (VND)': 65000, 'Gia ban (VND)': 150000, 'Ton kho Nhanh.vn': 120 }
+  ]);
+  ws['!cols'] = [{ wch: 15 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Products');
+  XLSX.writeFile(wb, 'SilenceProduction_Products_Template.xlsx');
+};
+
+export const exportBatchesToExcel = (batches: ProductionBatch[]): void => {
+  const wb = XLSX.utils.book_new();
+  const batchRows = batches.map((b) => ({
+    ID: b.id,
+    'Trang thai': b.status,
+    'Giai doan': b.currentStage,
+    'Ngay tao': b.createdAt.slice(0, 10),
+    'Ngay muc tieu': b.targetDate,
+    'San pham (SKU:SL,...)': b.items.map((i) => `${i.productSku}:${i.quantity}`).join(', '),
+  }));
+  const wsBatches = XLSX.utils.json_to_sheet(batchRows.length ? batchRows : [{
+    ID: '', 'Trang thai': 'running', 'Giai doan': 'ordered',
+    'Ngay tao': TODAY(), 'Ngay muc tieu': TODAY(), 'San pham (SKU:SL,...)': '',
+  }]);
+  wsBatches['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 35 }];
+  XLSX.utils.book_append_sheet(wb, wsBatches, 'ProductionBatches');
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  XLSX.writeFile(wb, `SilenceProduction_Batches_${timestamp}.xlsx`);
+};
+
+export const generateBatchesTemplate = (): void => {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet([
+    { ID: 'LOT-20260704-0001', 'Trang thai': 'running', 'Giai doan': 'ordered', 'Ngay tao': TODAY(), 'Ngay muc tieu': TODAY(), 'San pham (SKU:SL,...)': 'AO-THUN-01:150, AO-KHOAC-02:100' }
+  ]);
+  ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 35 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'ProductionBatches');
+  XLSX.writeFile(wb, 'SilenceProduction_Batches_Template.xlsx');
+};
+
+export const exportExpensesToExcel = (expenses: Expense[]): void => {
+  const wb = XLSX.utils.book_new();
+  const expenseRows = expenses.map((e) => ({
+    ID: e.id,
+    'Danh muc': e.category,
+    'So tien (VND)': e.amount,
+    'Ngay': e.expenseDate,
+    'Ghi chu': e.notes,
+  }));
+  const wsExpenses = XLSX.utils.json_to_sheet(expenseRows.length ? expenseRows : [
+    { ID: '', 'Danh muc': 'other', 'So tien (VND)': 0, 'Ngay': TODAY(), 'Ghi chu': '' }
+  ]);
+  wsExpenses['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, wsExpenses, 'Expenses');
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  XLSX.writeFile(wb, `SilenceProduction_Expenses_${timestamp}.xlsx`);
+};
+
+export const generateExpensesTemplate = (): void => {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet([
+    { ID: 'EXP-001', 'Danh muc': 'labor', 'So tien (VND)': 4500000, 'Ngay': TODAY(), 'Ghi chu': 'Lương nhân viên đóng gói' }
+  ]);
+  ws['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
+  XLSX.writeFile(wb, 'SilenceProduction_Expenses_Template.xlsx');
+};
+
+export const exportSalesToExcel = (sales: Sale[]): void => {
+  const wb = XLSX.utils.book_new();
+  const saleRows = sales.map((s) => ({
+    ID: s.id,
+    SKU: s.productSku,
+    'So luong': s.quantity,
+    'Don gia (VND)': s.unitPrice,
+    'Gia sau CK (VND)': s.discountedPrice ?? s.unitPrice,
+    'Tong don (VND)': s.totalOrderValue ?? (s.quantity * (s.discountedPrice ?? s.unitPrice)),
+    'CP san (VND)': s.platformFee ?? 0,
+    'Trang thai': s.orderStatus ?? 'success',
+    'Ngay ban': s.saleDate,
+    'Nguon': s.source,
+  }));
+  const wsSales = XLSX.utils.json_to_sheet(saleRows.length ? saleRows : [
+    { ID: '', SKU: '', 'So luong': 0, 'Don gia (VND)': 0, 'Gia sau CK (VND)': 0, 'Tong don (VND)': 0, 'CP san (VND)': 0, 'Trang thai': 'success', 'Ngay ban': TODAY(), 'Nguon': 'manual' }
+  ]);
+  wsSales['!cols'] = [{ wch: 18 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, wsSales, 'Sales');
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  XLSX.writeFile(wb, `SilenceProduction_Sales_${timestamp}.xlsx`);
+};
+
+export const generateSalesTemplate = (): void => {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet([
+    { ID: 'SALE-001', SKU: 'AO-THUN-01', 'So luong': 2, 'Don gia (VND)': 150000, 'Gia sau CK (VND)': 140000, 'Tong don (VND)': 280000, 'CP san (VND)': 15000, 'Trang thai': 'success', 'Ngay ban': TODAY(), 'Nguon': 'shopee' }
+  ]);
+  ws['!cols'] = [{ wch: 18 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Sales');
+  XLSX.writeFile(wb, 'SilenceProduction_Sales_Template.xlsx');
+};
+
+export const exportInventoryToExcel = (inventoryData: any[]): void => {
+  const wb = XLSX.utils.book_new();
+  const rows = inventoryData.map((d) => ({
+    SKU: d.sku,
+    'Ten san pham': d.name,
+    'Ton kha dung (Available)': d.available,
+    'Dang san xuat (In Production)': d.inProduction,
+    'Da ban (Sold)': d.sold,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 15 }, { wch: 35 }, { wch: 25 }, { wch: 25 }, { wch: 15 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  XLSX.writeFile(wb, `SilenceProduction_Inventory_${timestamp}.xlsx`);
+};
+
+export const exportForecastToExcel = (forecastData: any[]): void => {
+  const wb = XLSX.utils.book_new();
+  const rows = forecastData.map((d) => ({
+    SKU: d.sku,
+    'Ten san pham': d.name,
+    'Toc do ban/Ngay': d.dailyVelocity.toFixed(2),
+    'Ton kha dung': d.available,
+    'Dang san xuat': d.inProduction,
+    'Tong ton': d.totalStock,
+    'Ngay bao phu (Days of Cover)': d.daysOfCover === Infinity ? 'Infinity' : d.daysOfCover.toFixed(1),
+    'Diem dat hang (ROP)': d.reorderPoint.toFixed(1),
+    'De xuat goi (Proposed)': d.proposedQty,
+    'Canh bao (Alert)': d.alertLevel.toUpperCase(),
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 20 }, { wch: 20 }, { wch: 15 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'ForecastReport');
+  
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  XLSX.writeFile(wb, `SilenceProduction_Forecast_${timestamp}.xlsx`);
+};
+

@@ -3,8 +3,9 @@ import { useApp } from '../hooks/useApp';
 import { formatNumber } from '../utils/formatters';
 import {
   TrendingUp, AlertTriangle, CheckCircle2, Package,
-  Info, ClipboardCopy, Factory, ChevronDown, ChevronUp, RefreshCw,
+  Info, ClipboardCopy, Factory, ChevronDown, ChevronUp, RefreshCw, FileSpreadsheet
 } from 'lucide-react';
+import { exportForecastToExcel } from '../services/excelDataService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -197,6 +198,14 @@ export const Forecast: React.FC = () => {
           >
             <span>Tham số dự phóng</span>
             {configOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          <button
+            onClick={() => exportForecastToExcel(sortedRows)}
+            className="btn btn-primary"
+            style={{ gap: '6px', fontSize: '13px', backgroundColor: '#006c49', borderColor: '#006c49' }}
+          >
+            <FileSpreadsheet size={14} />
+            <span>Xuất báo cáo Excel</span>
           </button>
         </div>
       </div>
