@@ -2,13 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
 import {
   Wifi, WifiOff, Shield, Download, Upload, Trash2, CheckCircle, AlertCircle,
-  RefreshCw, Clock, ExternalLink, Link, Loader
+  RefreshCw, Clock, ExternalLink, Link, Loader, FileSpreadsheet, FileDown, FileUp
 } from 'lucide-react';
+import { exportToExcel, importFromExcel, generateExcelTemplate } from '../services/excelDataService';
+import type { ExcelImportResult, ExcelImportMode } from '../types';
 
 export const Settings: React.FC = () => {
   const {
     connectionStatus, apiMode, lastSyncTime, syncLogs,
     checkConnection, setApiMode, exportAllData, importAllData, clearData,
+    products, productionBatches, sales, expenses,
   } = useApp();
 
   // Form state cho API credentials
@@ -23,7 +26,16 @@ export const Settings: React.FC = () => {
   const [oauthStatus, setOauthStatus] = useState<{ type: 'info' | 'success' | 'error'; msg: string } | null>(null);
   const [isExchanging, setIsExchanging] = useState(false);
 
+  // Excel import state
+  const [excelPreview, setExcelPreview] = useState<ExcelImportResult | null>(null);
+  const [excelImportMode, setExcelImportMode] = useState<ExcelImportMode>('overwrite');
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const [showExcelConfirm, setShowExcelConfirm] = useState(false);
+  const [excelSuccess, setExcelSuccess] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   // Trao đổi OAuth code lấy Access Token
   const exchangeCodeForToken = async (code: string) => {
@@ -236,6 +248,50 @@ export const Settings: React.FC = () => {
     }
   };
 
+  // ── Excel Handlers ──
+
+  const handleExcelFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (excelFileInputRef.current) excelFileInputRef.current.value = '';
+    setIsParsingExcel(true);
+    setExcelError(null);
+    setExcelPreview(null);
+    setExcelSuccess(null);
+    try {
+      const result = await importFromExcel(file);
+      setExcelPreview(result);
+      setShowExcelConfirm(true);
+    } catch (err) {
+      setExcelError((err as Error).message);
+    } finally {
+      setIsParsingExcel(false);
+    }
+  };
+
+  const handleConfirmExcelImport = () => {
+    if (!excelPreview) return;
+    const jsonStr = JSON.stringify({
+      version: '1.0',
+      exportedAt: excelPreview.parsedAt,
+      products: excelImportMode === 'overwrite' ? excelPreview.products : [...products, ...excelPreview.products.filter(p => !products.find(ep => ep.sku === p.sku))],
+      productionBatches: excelImportMode === 'overwrite' ? excelPreview.productionBatches : [...productionBatches, ...excelPreview.productionBatches.filter(b => !productionBatches.find(eb => eb.id === b.id))],
+      sales: excelImportMode === 'overwrite' ? excelPreview.sales : [...sales, ...excelPreview.sales.filter(s => !sales.find(es => es.id === s.id))],
+      expenses: excelImportMode === 'overwrite' ? excelPreview.expenses : [...expenses, ...excelPreview.expenses.filter(ex => !expenses.find(ee => ee.id === ex.id))],
+    });
+    const result = importAllData(jsonStr);
+    if (result.success) {
+      const mode = excelImportMode === 'overwrite' ? 'Ghi đè' : 'Thêm mới';
+      setExcelSuccess(`✅ [${mode}] Import thành công: ${excelPreview.products.length} sản phẩm, ${excelPreview.sales.length} đơn hàng, ${excelPreview.expenses.length} chi phí, ${excelPreview.productionBatches.length} lô SX.`);
+      setShowExcelConfirm(false);
+      setExcelPreview(null);
+      setTimeout(() => window.location.reload(), 2000);
+    } else {
+      setExcelError(`Lỗi import: ${result.error}`);
+      setShowExcelConfirm(false);
+    }
+  };
+
   const statusColors = {
     connected: { bg: '#e6f6ef', color: '#006c49', label: 'Đã kết nối', icon: <Wifi size={16} /> },
     sandbox: { bg: '#fef3c7', color: '#b45309', label: 'Chế độ Sandbox', icon: <WifiOff size={16} /> },
@@ -445,6 +501,8 @@ export const Settings: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* ── JSON Backup/Restore ── */}
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#8191a9', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Backup JSON</div>
               <button onClick={handleExport} className="btn btn-secondary" style={{ width: '100%', gap: '8px' }}>
                 <Download size={14} />
                 <span>Tải xuống backup (JSON)</span>
@@ -470,6 +528,115 @@ export const Settings: React.FC = () => {
                 <div style={importResult.ok ? styles.successAlert : styles.errorAlert}>
                   {importResult.ok ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
                   <span>{importResult.msg}</span>
+                </div>
+              )}
+
+              {/* ── Excel Section ── */}
+              <div style={{ height: '1px', background: '#e8edf4', margin: '4px 0' }} />
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#8191a9', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileSpreadsheet size={13} />
+                Cập nhật qua Excel
+              </div>
+
+              <button
+                onClick={generateExcelTemplate}
+                className="btn btn-secondary"
+                style={{ width: '100%', gap: '8px', borderColor: '#1a7f3f', color: '#1a7f3f' }}
+              >
+                <FileDown size={14} />
+                <span>Tải template Excel mẫu</span>
+              </button>
+
+              <button
+                onClick={() => { const { products: p, productionBatches: b, sales: s, expenses: ex } = { products, productionBatches, sales, expenses }; exportToExcel(p, b, s, ex); }}
+                className="btn btn-secondary"
+                style={{ width: '100%', gap: '8px', borderColor: '#1a7f3f', color: '#1a7f3f' }}
+              >
+                <FileSpreadsheet size={14} />
+                <span>Xuất dữ liệu hiện tại ra Excel</span>
+              </button>
+
+              <button
+                onClick={() => excelFileInputRef.current?.click()}
+                className="btn btn-secondary"
+                disabled={isParsingExcel}
+                style={{ width: '100%', gap: '8px', borderColor: '#1a56db', color: '#1a56db' }}
+              >
+                {isParsingExcel
+                  ? <><Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /><span>Đang đọc file...</span></>
+                  : <><FileUp size={14} /><span>Import từ file Excel (.xlsx)</span></>}
+              </button>
+              <input
+                ref={excelFileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelFileChange}
+                style={{ display: 'none' }}
+              />
+
+              {excelError && (
+                <div style={styles.errorAlert}>
+                  <AlertCircle size={14} />
+                  <span>{excelError}</span>
+                </div>
+              )}
+
+              {excelSuccess && (
+                <div style={styles.successAlert}>
+                  <CheckCircle size={14} />
+                  <span>{excelSuccess}</span>
+                </div>
+              )}
+
+              {/* ── Excel Confirm Modal ── */}
+              {showExcelConfirm && excelPreview && (
+                <div style={styles.excelModal}>
+                  <div style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FileSpreadsheet size={16} color="#1a56db" /> Xác nhận import Excel
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#45474c', marginBottom: '8px' }}>
+                    Đọc lúc: {new Date(excelPreview.parsedAt).toLocaleString('vi-VN')}
+                  </div>
+
+                  <div style={styles.previewGrid}>
+                    <div style={styles.previewItem}><span style={styles.previewNum}>{excelPreview.products.length}</span><span style={styles.previewLabel}>Sản phẩm</span></div>
+                    <div style={styles.previewItem}><span style={styles.previewNum}>{excelPreview.sales.length}</span><span style={styles.previewLabel}>Đơn hàng</span></div>
+                    <div style={styles.previewItem}><span style={styles.previewNum}>{excelPreview.expenses.length}</span><span style={styles.previewLabel}>Chi phí</span></div>
+                    <div style={styles.previewItem}><span style={styles.previewNum}>{excelPreview.productionBatches.length}</span><span style={styles.previewLabel}>Lô SX</span></div>
+                  </div>
+
+                  {excelPreview.warnings.length > 0 && (
+                    <div style={{ fontSize: '11px', color: '#b45309', background: '#fef3c7', padding: '8px', borderRadius: '4px', marginBottom: '10px', maxHeight: '80px', overflowY: 'auto' }}>
+                      {excelPreview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', color: '#45474c' }}>Chọn chế độ import:</div>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <label style={styles.radioLabel}>
+                      <input type="radio" name="excelMode" value="overwrite"
+                        checked={excelImportMode === 'overwrite'}
+                        onChange={() => setExcelImportMode('overwrite')} />
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#ba1a1a', fontSize: '12px' }}>Ghi đè</div>
+                        <div style={{ fontSize: '11px', color: '#75777d' }}>Xóa data cũ, thay bằng data từ Excel</div>
+                      </div>
+                    </label>
+                    <label style={styles.radioLabel}>
+                      <input type="radio" name="excelMode" value="append"
+                        checked={excelImportMode === 'append'}
+                        onChange={() => setExcelImportMode('append')} />
+                      <div>
+                        <div style={{ fontWeight: 600, color: '#006c49', fontSize: '12px' }}>Thêm mới</div>
+                        <div style={{ fontSize: '11px', color: '#75777d' }}>Giữ data cũ, thêm data mới từ Excel</div>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => { setShowExcelConfirm(false); setExcelPreview(null); }} className="btn btn-secondary" style={{ flex: 1 }}>Hủy</button>
+                    <button onClick={handleConfirmExcelImport} className="btn btn-primary" style={{ flex: 1 }}>Xác nhận</button>
+                  </div>
                 </div>
               )}
 
@@ -613,5 +780,48 @@ const styles = {
     border: 'none',
     gap: '8px',
     width: '100%',
+  },
+  excelModal: {
+    padding: '16px',
+    borderRadius: '8px',
+    border: '1px solid #bfdbfe',
+    backgroundColor: '#eff6ff',
+  },
+  previewGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 1fr 1fr',
+    gap: '8px',
+    marginBottom: '12px',
+  },
+  previewItem: {
+    textAlign: 'center' as const,
+    padding: '8px 4px',
+    background: '#fff',
+    borderRadius: '6px',
+    border: '1px solid #e0e7f0',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '2px',
+  },
+  previewNum: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: '#1a56db',
+  },
+  previewLabel: {
+    fontSize: '10px',
+    color: '#75777d',
+  },
+  radioLabel: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '8px',
+    padding: '10px',
+    borderRadius: '6px',
+    border: '1px solid #e0e7f0',
+    backgroundColor: '#fff',
+    cursor: 'pointer',
   },
 };

@@ -58,3 +58,5 @@ Toàn bộ dữ liệu của hệ thống được quản lý thông qua `AppCon
 5. React render lại giao diện, các biểu đồ tự động cập nhật số liệu mới nhất.
 6. Tự động cập nhật kéo đơn hàng tạo từ sàn Thương mại điện từ về 
 7. tăng số lượng cập nhật tồn kho lên 3000 SKU cùng lúc
+8. Tính toán lãi lỗ dựa trên chi phí và doanh thu theo từng, ngày, tuần, tháng
+9.

@@ -118,3 +118,23 @@ export interface User {
   role: UserRole;
 }
 
+// ============================
+// Excel Import/Export
+// ============================
+
+/** Chế độ import: ghi đè toàn bộ hoặc thêm mới (append) */
+export type ExcelImportMode = 'overwrite' | 'append';
+
+/** Kết quả parse file Excel trước khi xác nhận */
+export interface ExcelImportResult {
+  products: Product[];
+  sales: Sale[];
+  expenses: Expense[];
+  productionBatches: ProductionBatch[];
+  warnings: string[];
+  /** Timestamp tạo lúc parse */
+  parsedAt: string;
+  /** Số sheet đọc được */
+  sheetsFound: string[];
+}
+
