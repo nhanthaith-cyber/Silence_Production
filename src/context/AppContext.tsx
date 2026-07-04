@@ -1,7 +1,8 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import type {
   Product, ProductionBatch, ProductionBatchItem, ProductionStage, Sale, Expense,
-  AppContextType, NhanhApiMode, ConnectionStatus, SyncLog, UserWithPassword
+  AppContextType, NhanhApiMode, ConnectionStatus, SyncLog, UserWithPassword,
+  User, ActionLog, ActionLogCategory
 } from '../types';
 import { defaultProducts, defaultBatches, defaultSales, defaultExpenses } from '../data/defaultData';
 import { getTodayISO, generateId } from '../utils/formatters';
@@ -67,6 +68,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [users, setUsers] = useState<UserWithPassword[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [actionLogs, setActionLogs] = useState<ActionLog[]>([]);
 
   // Connection & Sync State
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('checking');
@@ -77,6 +80,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Load from LocalStorage or seed defaults
   useEffect(() => {
     try {
+      const localUser = localStorage.getItem('silence_user');
+      if (localUser) setUser(JSON.parse(localUser));
+
+      const localActionLogs = localStorage.getItem('silence_action_logs');
+      if (localActionLogs) setActionLogs(JSON.parse(localActionLogs));
+
       const localUsers = localStorage.getItem('silence_prod_users');
       if (localUsers) setUsers(JSON.parse(localUsers));
       else {
@@ -177,6 +186,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(key, JSON.stringify(data));
   };
 
+  const getLatestUser = (): { username: string; name: string } => {
+    try {
+      const savedUser = localStorage.getItem('silence_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        return { username: parsed.username, name: parsed.name };
+      }
+    } catch (e) {
+      console.error('Failed to get latest user:', e);
+    }
+    return { username: 'Khách', name: 'Chưa đăng nhập' };
+  };
+
+  const createAndSaveActionLog = (action: string, details: string, category: ActionLogCategory) => {
+    const latestUser = getLatestUser();
+    const newLog: ActionLog = {
+      id: generateId('LOG', 6),
+      timestamp: new Date().toISOString(),
+      username: latestUser.username,
+      userDisplayName: latestUser.name,
+      action,
+      details,
+      category,
+    };
+    setActionLogs((prev) => {
+      const updated = [newLog, ...prev].slice(0, 1000);
+      localStorage.setItem('silence_action_logs', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   // Add sync log entry
   const addSyncLog = useCallback((source: string, action: string, result: 'success' | 'error' | 'sandbox', details: string) => {
     const log: SyncLog = {
@@ -208,6 +248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [...products, { ...product, sku: product.sku.toUpperCase() }];
     setProducts(updated);
     saveToLocal('silence_prod_products', updated);
+    createAndSaveActionLog('Thêm sản phẩm', `Đã thêm sản phẩm mới: ${product.name} (SKU: ${product.sku.toUpperCase()}) với giá bán ${product.defaultPrice.toLocaleString()}đ và giá vốn ${product.defaultCost.toLocaleString()}đ.`, 'product');
     return { success: true };
   };
 
@@ -246,6 +287,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setProducts(updated);
       saveToLocal('silence_prod_products', updated);
       addSyncLog('Hệ thống', 'Import Excel', 'success', `Đã import thành công ${added.length} sản phẩm từ file Excel.`);
+      createAndSaveActionLog('Import sản phẩm Excel', `Đã import thành công ${added.length} sản phẩm từ Excel (bỏ qua ${duplicates.length} trùng, ${invalid.length} lỗi).`, 'product');
     }
 
     return {
@@ -258,9 +300,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteProduct = (sku: string) => {
+    const productToDelete = products.find((p) => p.sku === sku);
     const updated = products.filter((p) => p.sku !== sku);
     setProducts(updated);
     saveToLocal('silence_prod_products', updated);
+    createAndSaveActionLog('Xóa sản phẩm', `Đã xóa sản phẩm: ${productToDelete ? productToDelete.name : sku} (SKU: ${sku}).`, 'product');
   };
 
   const createProductionBatch = (batch: { items: ProductionBatchItem[]; targetDate: string }) => {
@@ -277,10 +321,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [newBatch, ...productionBatches];
     setProductionBatches(updated);
     saveToLocal('silence_prod_batches', updated);
+    const itemsDesc = batch.items.map((i) => `${i.productSku}: ${i.quantity} cái`).join(', ');
+    createAndSaveActionLog('Tạo lệnh sản xuất', `Tạo lô sản xuất ${newBatch.id} với hạn hoàn thành ${batch.targetDate}. Sản phẩm: ${itemsDesc}.`, 'production');
   };
 
   const advanceBatchStage = (batchId: string) => {
     const stages: ProductionStage[] = ['ordered', 'paid', 'shipping', 'producing', 'delivered'];
+    let batchIdDesc = '';
+    let fromStage = '';
+    let toStage = '';
+
     const updated = productionBatches.map((batch) => {
       if (batch.id !== batchId) return batch;
 
@@ -290,6 +340,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const nextStage = stages[currentIndex + 1];
       const isCompleted = nextStage === 'delivered';
 
+      batchIdDesc = batch.id;
+      fromStage = batch.currentStage;
+      toStage = nextStage;
+
       return {
         ...batch,
         currentStage: nextStage,
@@ -298,12 +352,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     setProductionBatches(updated);
     saveToLocal('silence_prod_batches', updated);
+    if (batchIdDesc) {
+      createAndSaveActionLog('Cập nhật tiến độ', `Chuyển trạng thái lô ${batchIdDesc} từ "${fromStage}" sang "${toStage}".`, 'production');
+    }
   };
 
   const deleteProductionBatch = (batchId: string) => {
     const updated = productionBatches.filter((b) => b.id !== batchId);
     setProductionBatches(updated);
     saveToLocal('silence_prod_batches', updated);
+    createAndSaveActionLog('Xóa lệnh sản xuất', `Đã xóa lô sản xuất: ${batchId}.`, 'production');
   };
 
   const addSale = (saleData: Omit<Sale, 'id' | 'saleDate'>) => {
@@ -316,6 +374,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [newSale, ...sales];
     setSales(updated);
     saveToLocal('silence_prod_sales', updated);
+    createAndSaveActionLog('Thêm đơn bán lẻ', `Đã ghi nhận đơn hàng ${newSale.id} (SKU: ${saleData.productSku}, SL: ${saleData.quantity}, Đơn giá: ${saleData.discountedPrice?.toLocaleString()}đ).`, 'sale');
   };
 
   const addExpense = (expenseData: Omit<Expense, 'id' | 'expenseDate'>) => {
@@ -328,6 +387,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [newExpense, ...expenses];
     setExpenses(updated);
     saveToLocal('silence_prod_expenses', updated);
+    createAndSaveActionLog('Ghi nhận chi phí', `Đã ghi nhận chi phí ${newExpense.id} thuộc nhóm "${expenseData.category}" số tiền ${expenseData.amount.toLocaleString()}đ.`, 'expense');
   };
 
   // ============================
@@ -409,6 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       addSyncLog('Nhanh.vn', 'Đồng bộ đơn hàng', connectionStatus === 'connected' ? 'success' : 'sandbox', logMsg);
+      createAndSaveActionLog('Đồng bộ đơn hàng', `Đồng bộ đơn hàng từ Nhanh.vn: ${logMsg}`, 'sync');
       return addedCount;
     } catch (e) {
       console.error('Lỗi syncSalesFromNhanh:', e);
@@ -438,6 +499,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       addSyncLog('Nhanh.vn', 'Nhận tồn kho', connectionStatus === 'connected' ? 'success' : 'sandbox',
         `Đã cập nhật ${updatedCount} sản phẩm, thêm mới ${merged.length - products.length} sản phẩm.`);
+      createAndSaveActionLog('Nhận tồn kho', `Đồng bộ và nhận tồn kho từ Nhanh.vn: Đã cập nhật ${updatedCount} sản phẩm, thêm mới ${merged.length - products.length} sản phẩm.`, 'sync');
       return updatedCount;
     } catch (e) {
       console.error('Lỗi syncStockFromNhanh:', e);
@@ -474,6 +536,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           saveToLocal('silence_prod_products', updated);
           return updated;
         });
+        createAndSaveActionLog('Đẩy tồn kho', `Đã đẩy tồn kho SKU ${sku} (${availableStock} cái) lên Nhanh.vn thành công.`, 'sync');
+      } else {
+        createAndSaveActionLog('Đẩy tồn kho', `Đẩy tồn kho SKU ${sku} lên Nhanh.vn thất bại.`, 'sync');
       }
 
       return success;
@@ -499,6 +564,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setApiMode = (mode: NhanhApiMode) => {
     setApiModeState(mode);
     localStorage.setItem('silence_nhanh_api_mode', mode);
+    createAndSaveActionLog('Đổi chế độ kết nối', `Chuyển sang chế độ kết nối ${mode === 'live' ? 'Live (thực tế)' : 'Sandbox (giả lập)'}.`, 'system');
     // Re-check connection khi đổi mode
     checkConnection();
   };
@@ -531,6 +597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addSyncLog('Hệ thống', 'Import dữ liệu', 'success',
       `Đã import: ${data.products.length} sản phẩm, ${data.productionBatches.length} lô SX, ${data.sales.length} đơn hàng, ${data.expenses.length} chi phí.`);
+    createAndSaveActionLog('Import Backup JSON', `Đã khôi phục dữ liệu: ${data.products.length} SP, ${data.productionBatches.length} Lô SX, ${data.sales.length} Đơn, ${data.expenses.length} Chi phí.`, 'system');
 
     return { success: true };
   };
@@ -541,11 +608,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('silence_prod_sales');
     localStorage.removeItem('silence_prod_expenses');
     localStorage.removeItem('silence_prod_users');
+    localStorage.removeItem('silence_action_logs');
     setProducts(defaultProducts);
     setProductionBatches(defaultBatches);
     setSales(defaultSales);
     setExpenses(defaultExpenses);
     setUsers(defaultUsers);
+    setActionLogs([]);
+
+    // Log reset action
+    const newLog: ActionLog = {
+      id: generateId('LOG', 6),
+      timestamp: new Date().toISOString(),
+      username: 'system',
+      userDisplayName: 'Hệ thống',
+      action: 'Reset dữ liệu',
+      details: 'Khôi phục cài đặt gốc và xóa toàn bộ dữ liệu người dùng.',
+      category: 'system',
+    };
+    setActionLogs([newLog]);
+    localStorage.setItem('silence_action_logs', JSON.stringify([newLog]));
   };
 
   const addUser = (newUser: UserWithPassword) => {
@@ -557,6 +639,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = [...users, { ...newUser, username: usernameClean }];
     setUsers(updated);
     saveToLocal('silence_prod_users', updated);
+    createAndSaveActionLog('Tạo tài khoản', `Tạo tài khoản mới: ${newUser.username} (Chức danh: ${newUser.role}) với quyền: ${newUser.allowedPages.join(', ')}.`, 'user_management');
     return { success: true };
   };
 
@@ -568,7 +651,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = users.filter((u) => u.username !== usernameClean);
     setUsers(updated);
     saveToLocal('silence_prod_users', updated);
+    createAndSaveActionLog('Xóa tài khoản', `Xóa tài khoản người dùng: ${usernameClean}.`, 'user_management');
     return { success: true };
+  };
+
+  const login = (loggedUser: User) => {
+    setUser(loggedUser);
+    localStorage.setItem('silence_user', JSON.stringify(loggedUser));
+    
+    // Log đăng nhập
+    const newLog: ActionLog = {
+      id: generateId('LOG', 6),
+      timestamp: new Date().toISOString(),
+      username: loggedUser.username,
+      userDisplayName: loggedUser.name,
+      action: 'Đăng nhập',
+      details: `Đăng nhập thành công với vai trò: ${loggedUser.role}`,
+      category: 'auth',
+    };
+    setActionLogs((prev) => {
+      const updated = [newLog, ...prev].slice(0, 1000);
+      localStorage.setItem('silence_action_logs', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const logout = () => {
+    const latestUser = getLatestUser();
+    const newLog: ActionLog = {
+      id: generateId('LOG', 6),
+      timestamp: new Date().toISOString(),
+      username: latestUser.username,
+      userDisplayName: latestUser.name,
+      action: 'Đăng xuất',
+      details: 'Đăng xuất khỏi hệ thống',
+      category: 'auth',
+    };
+    setActionLogs((prev) => {
+      const updated = [newLog, ...prev].slice(0, 1000);
+      localStorage.setItem('silence_action_logs', JSON.stringify(updated));
+      return updated;
+    });
+    setUser(null);
+    localStorage.removeItem('silence_user');
+  };
+
+  const clearActionLogs = () => {
+    setActionLogs([]);
+    localStorage.removeItem('silence_action_logs');
+    createAndSaveActionLog('Xóa nhật ký', 'Đã xóa toàn bộ nhật ký thao tác trên hệ thống.', 'system');
   };
 
   return (
@@ -601,6 +732,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         addUser,
         deleteUser,
+        user,
+        login,
+        logout,
+        actionLogs,
+        addActionLog: createAndSaveActionLog,
+        clearActionLogs,
       }}
     >
       {children}

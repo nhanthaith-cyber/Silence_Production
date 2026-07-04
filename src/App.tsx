@@ -15,22 +15,11 @@ import { Login } from './components/Login';
 import type { User } from './types';
 
 const MainAppContent: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, login, logout, clearData } = useApp();
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const { clearData } = useApp();
 
-  // Load user from localStorage on mount + detect Nhanh.vn OAuth callback
+  // Detect Nhanh.vn OAuth callback
   useEffect(() => {
-    const savedUser = localStorage.getItem('silence_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error('Failed to parse saved user:', e);
-        localStorage.removeItem('silence_user');
-      }
-    }
-
     // Phát hiện OAuth callback từ Nhanh.vn (?accessCode=XXXX hoặc ?code=XXXX trong URL)
     const urlParams = new URLSearchParams(window.location.search);
     const oauthCode = urlParams.get('accessCode') || urlParams.get('code');
@@ -66,15 +55,13 @@ const MainAppContent: React.FC = () => {
   };
 
   const handleLogin = (loggedUser: User) => {
-    setUser(loggedUser);
-    localStorage.setItem('silence_user', JSON.stringify(loggedUser));
+    login(loggedUser);
     // Sau khi đăng nhập luôn chuyển vào trang Tổng quan (Dashboard)
     setCurrentPage('dashboard');
   };
 
   const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('silence_user');
+    logout();
   };
 
   const getPageTitle = (page: string) => {

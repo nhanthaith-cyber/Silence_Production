@@ -12,7 +12,8 @@ export const Settings: React.FC = () => {
     connectionStatus, apiMode, lastSyncTime, syncLogs,
     checkConnection, setApiMode, exportAllData, importAllData, clearData,
     products, productionBatches, sales, expenses,
-    users, addUser, deleteUser
+    users, addUser, deleteUser,
+    user, actionLogs, clearActionLogs
   } = useApp();
 
   // Form state cho API credentials
@@ -107,6 +108,26 @@ export const Settings: React.FC = () => {
         ? prev.filter(p => p !== pageKey)
         : [...prev, pageKey]
     );
+  };
+
+  // Activity Logs States
+  const [logFilterCategory, setLogFilterCategory] = useState<string>('all');
+  const [logSearchQuery, setLogSearchQuery] = useState<string>('');
+
+  const filteredLogs = actionLogs.filter((log) => {
+    const matchesCategory = logFilterCategory === 'all' || log.category === logFilterCategory;
+    const matchesSearch =
+      log.username.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
+      log.userDisplayName.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
+      log.action.toLowerCase().includes(logSearchQuery.toLowerCase()) ||
+      log.details.toLowerCase().includes(logSearchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleClearLogsClick = () => {
+    if (confirm('Bạn có chắc chắn muốn xóa toàn bộ nhật ký thao tác trên hệ thống?')) {
+      clearActionLogs();
+    }
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -365,6 +386,45 @@ export const Settings: React.FC = () => {
       setExcelError(`Lỗi import: ${result.error}`);
       setShowExcelConfirm(false);
     }
+  };
+
+  const getCategoryBadge = (cat: string) => {
+    let bg = '#e2e8f0';
+    let color = '#475569';
+    let text = cat;
+
+    switch (cat) {
+      case 'auth':
+        bg = '#e0f2fe'; color = '#0369a1'; text = 'Đăng nhập';
+        break;
+      case 'product':
+        bg = '#ccfbf1'; color = '#0f766e'; text = 'Sản phẩm';
+        break;
+      case 'production':
+        bg = '#fef3c7'; color = '#b45309'; text = 'Sản xuất';
+        break;
+      case 'sale':
+        bg = '#f3e8ff'; color = '#7e22ce'; text = 'Đơn hàng';
+        break;
+      case 'expense':
+        bg = '#ffe4e6'; color = '#be123c'; text = 'Chi phí';
+        break;
+      case 'sync':
+        bg = '#d1fae5'; color = '#047857'; text = 'Đồng bộ';
+        break;
+      case 'user_management':
+        bg = '#e0e7ff'; color = '#4338ca'; text = 'Tài khoản';
+        break;
+      case 'system':
+        bg = '#f1f5f9'; color = '#334155'; text = 'Hệ thống';
+        break;
+    }
+
+    return (
+      <span style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: bg, color, borderRadius: '4px', fontWeight: 600 }}>
+        {text}
+      </span>
+    );
   };
 
   const statusColors = {
@@ -729,14 +789,16 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Sync Logs */}
-        <div className="card" style={{ flex: 1.5, minWidth: '400px', height: 'fit-content' }}>
-          <div className="card-header">
-            <h3>Lịch sử đồng bộ</h3>
-            <span className="badge badge-primary">{syncLogs.length} Bản ghi</span>
-          </div>
+        {/* Right Column: Layout */}
+        <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: '24px', minWidth: '400px' }}>
+          {/* Sync Logs Card */}
+          <div className="card" style={{ height: 'fit-content' }}>
+            <div className="card-header">
+              <h3>Lịch sử đồng bộ</h3>
+              <span className="badge badge-primary">{syncLogs.length} Bản ghi</span>
+            </div>
 
-          <div className="table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+            <div className="table-container" style={{ maxHeight: '250px', overflowY: 'auto' }}>
             <table>
               <thead>
                 <tr>
@@ -944,8 +1006,118 @@ export const Settings: React.FC = () => {
             </form>
           </div>
         </div>
+
+        {/* Activity Logs Card */}
+        <div className="card" style={{ marginTop: '0' }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>Nhật ký hoạt động hệ thống</h3>
+            <button
+              onClick={handleClearLogsClick}
+              disabled={user?.role !== 'admin'}
+              className="btn btn-secondary"
+              style={{
+                borderColor: '#ba1a1a',
+                color: '#ba1a1a',
+                fontSize: '11px',
+                padding: '4px 8px',
+                minWidth: 'auto',
+                opacity: user?.role === 'admin' ? 1 : 0.5,
+                cursor: user?.role === 'admin' ? 'pointer' : 'not-allowed'
+              }}
+            >
+              <Trash2 size={12} style={{ marginRight: '4px' }} />
+              Xóa nhật ký
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+            <div style={{ flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Tìm hoạt động, chi tiết hoặc người dùng..."
+                value={logSearchQuery}
+                onChange={(e) => setLogSearchQuery(e.target.value)}
+                style={{ padding: '6px 10px', fontSize: '12px', width: '100%', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+              />
+            </div>
+            <div style={{ width: '150px' }}>
+              <select
+                value={logFilterCategory}
+                onChange={(e) => setLogFilterCategory(e.target.value)}
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '12px',
+                  width: '100%',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#fff',
+                  color: '#1e293b',
+                  height: '34px'
+                }}
+              >
+                <option value="all">Tất cả nhóm</option>
+                <option value="auth">Đăng nhập</option>
+                <option value="product">Sản phẩm</option>
+                <option value="production">Sản xuất</option>
+                <option value="sale">Đơn hàng</option>
+                <option value="expense">Chi phí</option>
+                <option value="sync">Đồng bộ Nhanh</option>
+                <option value="user_management">Tài khoản</option>
+                <option value="system">Hệ thống</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: '140px' }}>Thời gian</th>
+                  <th style={{ width: '120px' }}>Người thực hiện</th>
+                  <th style={{ width: '130px' }}>Hoạt động</th>
+                  <th>Chi tiết</th>
+                  <th style={{ width: '100px' }}>Phân loại</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', color: '#8191a9', padding: '30px 24px', fontSize: '13px' }}>
+                      Không tìm thấy nhật ký hoạt động nào phù hợp.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td className="mono" style={{ fontSize: '11px', whiteSpace: 'nowrap' }}>
+                        {new Date(log.timestamp).toLocaleString('vi-VN', {
+                          hour: '2-digit', minute: '2-digit', second: '2-digit',
+                          day: '2-digit', month: '2-digit', year: 'numeric'
+                        })}
+                      </td>
+                      <td style={{ fontSize: '12px' }}>
+                        <div style={{ fontWeight: 600 }}>{log.userDisplayName}</div>
+                        <div className="mono" style={{ fontSize: '10px', color: '#75777d' }}>@{log.username}</div>
+                      </td>
+                      <td style={{ fontWeight: 600, fontSize: '12px', color: '#091426' }}>{log.action}</td>
+                      <td style={{ fontSize: '12px', color: '#45474c', wordBreak: 'break-word' }}>
+                        {log.details}
+                      </td>
+                      <td>
+                        {getCategoryBadge(log.category)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
+  </div>
   );
 };
 

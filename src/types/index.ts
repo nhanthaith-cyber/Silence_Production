@@ -124,6 +124,28 @@ export interface AppContextType {
   users: UserWithPassword[];
   addUser: (user: UserWithPassword) => { success: boolean; error?: string };
   deleteUser: (username: string) => { success: boolean; error?: string };
+
+  // User Session Management
+  user: User | null;
+  login: (user: User) => void;
+  logout: () => void;
+
+  // Platform Action Logs
+  actionLogs: ActionLog[];
+  addActionLog: (action: string, details: string, category: ActionLogCategory) => void;
+  clearActionLogs: () => void;
+}
+
+export type ActionLogCategory = 'auth' | 'product' | 'production' | 'sale' | 'expense' | 'system' | 'user_management' | 'sync';
+
+export interface ActionLog {
+  id: string;
+  timestamp: string;
+  username: string;
+  userDisplayName: string;
+  action: string;
+  details: string;
+  category: ActionLogCategory;
 }
 
 export interface User {
