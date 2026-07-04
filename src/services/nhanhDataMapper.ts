@@ -28,15 +28,28 @@ export const mapNhanhProductToLocal = (
  * Phân loại nguồn: Shopee, Tiktok, Lên ngoài
  */
 export const mapNhanhOrderToSale = (nhanhOrder: NhanhOrder): Sale[] => {
+  // Tính tổng giá trị đơn từ discountedPrice (ưu tiên) hoặc price
+  const calculatedTotal = nhanhOrder.products.reduce(
+    (sum, p) => sum + (p.discountedPrice ?? p.price) * p.quantity,
+    0
+  );
+  const totalOrderValue = nhanhOrder.totalPrice ?? calculatedTotal;
+
   return nhanhOrder.products.map((p, index) => ({
     id: `${nhanhOrder.id}${index > 0 ? `-${index}` : ''}`,
+    orderId: String(nhanhOrder.id),
     productSku: p.sku.toUpperCase().trim(),
     quantity: p.quantity,
     unitPrice: p.price,
+    discountedPrice: p.discountedPrice ?? p.price,
+    totalOrderValue,
+    platformFee: nhanhOrder.platformFee ?? 0,
+    orderStatus: nhanhOrder.status,
     saleDate: nhanhOrder.createdAt.split(' ')[0] || new Date().toISOString().split('T')[0],
     source: mapChannelToSource(nhanhOrder.salesChannel),
   }));
 };
+
 
 /**
  * Map salesChannel string → SaleSource type

@@ -300,44 +300,185 @@ export const Expenses: React.FC = () => {
             </div>
 
             {/* ── Tab: Đơn hàng ── */}
-            {salesTab === 'orders' && (
-              <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>ID Đơn hàng</th>
-                      <th>Ngày</th>
-                      <th>Giá trị đơn</th>
-                      <th>Nguồn</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sales.length === 0 ? (
+            {salesTab === 'orders' && (() => {
+              // Group sales by orderId (fallback to id nếu chưa có orderId)
+              const orderMap: Map<string, typeof sales> = new Map();
+              sales.forEach((sale) => {
+                const key = sale.orderId || sale.id;
+                if (!orderMap.has(key)) orderMap.set(key, []);
+                orderMap.get(key)!.push(sale);
+              });
+
+              const orderGroups = Array.from(orderMap.entries())
+                .sort(([, a], [, b]) => b[0].saleDate.localeCompare(a[0].saleDate));
+
+              const statusLabel = (s?: string) => {
+                if (!s) return '—';
+                const map: Record<string, string> = {
+                  success: 'Hoàn thành', completed: 'Hoàn thành', done: 'Hoàn thành',
+                  cancelled: 'Đã hủy', cancel: 'Đã hủy',
+                  shipping: 'Đang giao', delivering: 'Đang giao',
+                  pending: 'Chờ xử lý', new: 'Mới',
+                  returned: 'Hoàn hàng',
+                };
+                return map[s.toLowerCase()] || s;
+              };
+
+              const statusColor = (s?: string) => {
+                if (!s) return '#8191a9';
+                const l = s.toLowerCase();
+                if (['success','completed','done'].includes(l)) return '#006c49';
+                if (['cancelled','cancel','returned'].includes(l)) return '#ba1a1a';
+                if (['shipping','delivering'].includes(l)) return '#1a56db';
+                return '#b45309';
+              };
+
+              return (
+                <div className="table-container" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                  <table style={{ tableLayout: 'fixed', width: '100%' }}>
+                    <colgroup>
+                      <col style={{ width: '130px' }} />  {/* ID đơn */}
+                      <col style={{ width: '100px' }} />  {/* SKU */}
+                      <col />                             {/* Tên SP */}
+                      <col style={{ width: '90px' }} />   {/* Giá sau CK */}
+                      <col style={{ width: '50px' }} />   {/* SL */}
+                      <col style={{ width: '100px' }} />  {/* Tổng đơn */}
+                      <col style={{ width: '90px' }} />   {/* CP sàn */}
+                      <col style={{ width: '90px' }} />   {/* Trạng thái */}
+                    </colgroup>
+                    <thead>
                       <tr>
-                        <td colSpan={4} style={{ textAlign: 'center', color: '#8191a9', padding: '24px' }}>
-                          Chưa có đơn hàng. Nhấn "Đồng bộ" để tải từ Nhanh.vn.
-                        </td>
+                        <th>ID Đơn hàng</th>
+                        <th>SKU</th>
+                        <th>Tên sản phẩm</th>
+                        <th style={{ textAlign: 'right' }}>Giá sau CK</th>
+                        <th style={{ textAlign: 'center' }}>SL</th>
+                        <th style={{ textAlign: 'right' }}>Tổng đơn</th>
+                        <th style={{ textAlign: 'right' }}>CP sàn</th>
+                        <th style={{ textAlign: 'center' }}>Trạng thái</th>
                       </tr>
-                    ) : (
-                      sales.map((sale) => (
-                        <tr key={sale.id}>
-                          <td className="mono" style={{ fontSize: '11px', color: '#45474c' }}>{sale.id}</td>
-                          <td className="mono" style={{ fontSize: '12px' }}>{sale.saleDate}</td>
-                          <td className="mono" style={{ fontWeight: 600 }}>
-                            {formatCurrency(sale.quantity * sale.unitPrice)}
-                          </td>
-                          <td>
-                            <span className={`badge ${sourceBadgeClass(sale.source)}`}>
-                              {sourceLabel(sale.source)}
-                            </span>
+                    </thead>
+                    <tbody>
+                      {orderGroups.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} style={{ textAlign: 'center', color: '#8191a9', padding: '32px' }}>
+                            Chưa có đơn hàng. Nhấn "Đồng bộ" để tải từ Nhanh.vn.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      ) : (
+                        orderGroups.map(([orderId, items]) => {
+                          const firstItem = items[0];
+                          const totalVal = firstItem.totalOrderValue
+                            ?? items.reduce((s, i) => s + (i.discountedPrice ?? i.unitPrice) * i.quantity, 0);
+                          const fee = firstItem.platformFee ?? 0;
+                          const status = firstItem.orderStatus;
+                          const isMulti = items.length > 1;
+
+                          return items.map((sale, idx) => {
+                            const prod = products.find((p) => p.sku === sale.productSku);
+                            const effectivePrice = sale.discountedPrice ?? sale.unitPrice;
+                            const isFirst = idx === 0;
+
+                            return (
+                              <tr
+                                key={sale.id}
+                                style={{
+                                  borderTop: isFirst ? '2px solid #e0e7f0' : undefined,
+                                  background: isFirst && isMulti ? '#fafbff' : undefined,
+                                }}
+                              >
+                                {/* ID đơn — chỉ hiển thị ở dòng đầu */}
+                                <td className="mono" style={{ fontSize: '10px', color: '#45474c', verticalAlign: 'middle' }}>
+                                  {isFirst ? (
+                                    <div>
+                                      <div style={{ fontWeight: 600, color: '#091426', fontSize: '11px' }}>{orderId}</div>
+                                      <div style={{ color: '#8191a9', fontSize: '10px', marginTop: '2px' }}>{sale.saleDate}</div>
+                                      <div style={{ marginTop: '3px' }}>
+                                        <span className={`badge ${sourceBadgeClass(sale.source)}`} style={{ fontSize: '9px' }}>
+                                          {sourceLabel(sale.source)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ paddingLeft: '8px', borderLeft: '2px solid #e8edf4', color: '#c0c8d4', fontSize: '10px' }}>
+                                      └ dòng {idx + 1}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* SKU */}
+                                <td className="mono" style={{ fontSize: '11px', color: '#1a56db', fontWeight: 600 }}>
+                                  {sale.productSku}
+                                </td>
+
+                                {/* Tên sản phẩm */}
+                                <td style={{ fontSize: '12px', fontWeight: 500 }}>
+                                  {prod?.name || sale.productSku}
+                                </td>
+
+                                {/* Giá sau chiết khấu */}
+                                <td className="mono" style={{ textAlign: 'right', fontSize: '12px' }}>
+                                  {formatCurrency(effectivePrice)}
+                                  {effectivePrice < sale.unitPrice && (
+                                    <div style={{ fontSize: '10px', color: '#b45309', textDecoration: 'line-through' }}>
+                                      {formatCurrency(sale.unitPrice)}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* Số lượng */}
+                                <td className="mono" style={{ textAlign: 'center', fontWeight: 700, fontSize: '14px' }}>
+                                  {sale.quantity}
+                                </td>
+
+                                {/* Tổng giá trị đơn — chỉ hiện ở dòng đầu */}
+                                <td className="mono" style={{ textAlign: 'right', fontWeight: 700, color: '#006c49', fontSize: '13px', verticalAlign: 'middle' }}>
+                                  {isFirst ? (
+                                    <div>
+                                      {formatCurrency(totalVal)}
+                                      {isMulti && (
+                                        <div style={{ fontSize: '9px', color: '#8191a9', fontWeight: 400 }}>
+                                          {items.length} sản phẩm
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </td>
+
+                                {/* Chi phí sàn — chỉ hiện ở dòng đầu */}
+                                <td className="mono" style={{ textAlign: 'right', fontSize: '12px', color: '#ba1a1a', verticalAlign: 'middle' }}>
+                                  {isFirst ? (fee > 0 ? formatCurrency(fee) : <span style={{ color: '#c0c8d4' }}>—</span>) : null}
+                                </td>
+
+                                {/* Trạng thái — chỉ hiện ở dòng đầu */}
+                                <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                  {isFirst ? (
+                                    <span style={{
+                                      display: 'inline-block',
+                                      padding: '2px 8px',
+                                      borderRadius: '20px',
+                                      fontSize: '10px',
+                                      fontWeight: 600,
+                                      color: statusColor(status),
+                                      background: statusColor(status) + '18',
+                                      border: `1px solid ${statusColor(status)}33`,
+                                      whiteSpace: 'nowrap',
+                                    }}>
+                                      {statusLabel(status)}
+                                    </span>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+
 
             {/* ── Tab: Sản phẩm bán ── */}
             {salesTab === 'products' && (() => {

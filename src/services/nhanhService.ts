@@ -32,10 +32,17 @@ export interface NhanhOrder {
   products: {
     sku: string;
     quantity: number;
+    /** Giá bán gốc */
     price: number;
+    /** Giá sau chiết khấu */
+    discountedPrice?: number;
   }[];
   createdAt: string;
   status: string;
+  /** Tổng giá trị đơn hàng (tất cả sản phẩm) */
+  totalPrice?: number;
+  /** Chi phí sàn (hoa hồng Shopee/TikTok) */
+  platformFee?: number;
   /** Nguồn đơn hàng: Shopee, Tiktok, Lên ngoài... */
   salesChannel: string;
 }

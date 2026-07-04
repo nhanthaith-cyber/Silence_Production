@@ -33,9 +33,20 @@ export interface ProductionBatch {
 
 export interface Sale {
   id: string;
+  /** ID đơn hàng gốc từ Nhanh.vn — nhiều Sale cùng orderId = cùng 1 đơn */
+  orderId?: string;
   productSku: string;
   quantity: number;
+  /** Giá bán gốc (trước chiết khấu) */
   unitPrice: number;
+  /** Giá bán sau chiết khấu — dùng để tính doanh thu thực */
+  discountedPrice?: number;
+  /** Tổng giá trị đơn hàng (bao gồm tất cả sản phẩm trong đơn) */
+  totalOrderValue?: number;
+  /** Chi phí sàn (hoa hồng Shopee, TikTok...) của toàn đơn */
+  platformFee?: number;
+  /** Trạng thái đơn hàng từ Nhanh.vn */
+  orderStatus?: string;
   saleDate: string;
   source: SaleSource;
 }
