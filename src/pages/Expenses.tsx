@@ -19,6 +19,9 @@ export const Expenses: React.FC = () => {
   const [syncFromDate, setSyncFromDate] = useState('');
   const [syncToDate, setSyncToDate] = useState('');
 
+  // Sales tab
+  const [salesTab, setSalesTab] = useState<'orders' | 'products'>('orders');
+
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
     setExpenseSuccess(false);
@@ -259,58 +262,170 @@ export const Expenses: React.FC = () => {
 
         {/* Right Side: Lists */}
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '24px', minWidth: '320px' }}>
-          {/* Sales History */}
+          {/* Sales History — Tabbed */}
           <div className="card">
             <div className="card-header">
-              <h3>Lịch sử đơn bán hàng</h3>
+              <h3>Lịch sử bán hàng</h3>
               <span className="badge badge-primary">{sales.length} Đơn hàng</span>
             </div>
 
-            <div className="table-container" style={{ maxHeight: '280px', overflowY: 'auto' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Mã Đơn</th>
-                    <th>Sản phẩm</th>
-                    <th>SL</th>
-                    <th>Giá Bán</th>
-                    <th>Doanh thu</th>
-                    <th>Nguồn</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sales.length === 0 ? (
+            {/* ── Slide Tab Bar ── */}
+            <div style={tabStyles.tabTrack}>
+              <div
+                style={{
+                  ...tabStyles.tabSlider,
+                  transform: salesTab === 'orders' ? 'translateX(0%)' : 'translateX(100%)',
+                }}
+              />
+              <button
+                style={{
+                  ...tabStyles.tabBtn,
+                  color: salesTab === 'orders' ? '#fff' : '#8191a9',
+                  fontWeight: salesTab === 'orders' ? 700 : 500,
+                }}
+                onClick={() => setSalesTab('orders')}
+              >
+                📋 Đơn hàng
+              </button>
+              <button
+                style={{
+                  ...tabStyles.tabBtn,
+                  color: salesTab === 'products' ? '#fff' : '#8191a9',
+                  fontWeight: salesTab === 'products' ? 700 : 500,
+                }}
+                onClick={() => setSalesTab('products')}
+              >
+                📦 Sản phẩm bán
+              </button>
+            </div>
+
+            {/* ── Tab: Đơn hàng ── */}
+            {salesTab === 'orders' && (
+              <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', color: '#8191a9', padding: '24px' }}>
-                        Chưa có đơn bán hàng. Nhấn "Đồng bộ" để tải đơn hàng từ Nhanh.vn.
-                      </td>
+                      <th>ID Đơn hàng</th>
+                      <th>Ngày</th>
+                      <th>Giá trị đơn</th>
+                      <th>Nguồn</th>
                     </tr>
-                  ) : (
-                    sales.map((sale) => {
-                      const prod = products.find((p) => p.sku === sale.productSku);
-                      return (
+                  </thead>
+                  <tbody>
+                    {sales.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', color: '#8191a9', padding: '24px' }}>
+                          Chưa có đơn hàng. Nhấn "Đồng bộ" để tải từ Nhanh.vn.
+                        </td>
+                      </tr>
+                    ) : (
+                      sales.map((sale) => (
                         <tr key={sale.id}>
-                          <td className="mono" style={{ fontSize: '12px' }}>{sale.id}</td>
-                          <td>
-                            <div style={{ fontWeight: 500 }}>{prod?.name || sale.productSku}</div>
-                            <div className="mono" style={{ fontSize: '11px', color: '#8191a9' }}>{sale.productSku}</div>
+                          <td className="mono" style={{ fontSize: '11px', color: '#45474c' }}>{sale.id}</td>
+                          <td className="mono" style={{ fontSize: '12px' }}>{sale.saleDate}</td>
+                          <td className="mono" style={{ fontWeight: 600 }}>
+                            {formatCurrency(sale.quantity * sale.unitPrice)}
                           </td>
-                          <td className="mono">{sale.quantity}</td>
-                          <td className="mono">{formatCurrency(sale.unitPrice)}</td>
-                          <td className="mono" style={{ fontWeight: 600 }}>{formatCurrency(sale.quantity * sale.unitPrice)}</td>
                           <td>
                             <span className={`badge ${sourceBadgeClass(sale.source)}`}>
                               {sourceLabel(sale.source)}
                             </span>
                           </td>
                         </tr>
-                      );
-                    })
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* ── Tab: Sản phẩm bán ── */}
+            {salesTab === 'products' && (() => {
+              // Gom nhóm theo SKU
+              const grouped: Record<string, { name: string; sku: string; totalQty: number; totalRevenue: number }> = {};
+              sales.forEach((sale) => {
+                const prod = products.find((p) => p.sku === sale.productSku);
+                if (!grouped[sale.productSku]) {
+                  grouped[sale.productSku] = {
+                    sku: sale.productSku,
+                    name: prod?.name || sale.productSku,
+                    totalQty: 0,
+                    totalRevenue: 0,
+                  };
+                }
+                grouped[sale.productSku].totalQty += sale.quantity;
+                grouped[sale.productSku].totalRevenue += sale.quantity * sale.unitPrice;
+              });
+              const rows = Object.values(grouped).sort((a, b) => b.totalQty - a.totalQty);
+              const totalQtyAll = rows.reduce((s, r) => s + r.totalQty, 0);
+
+              return (
+                <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Sản phẩm</th>
+                        <th>SL bán</th>
+                        <th>% tổng</th>
+                        <th>Doanh thu</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} style={{ textAlign: 'center', color: '#8191a9', padding: '24px' }}>
+                            Chưa có dữ liệu sản phẩm bán.
+                          </td>
+                        </tr>
+                      ) : (
+                        rows.map((row) => {
+                          const pct = totalQtyAll > 0 ? (row.totalQty / totalQtyAll) * 100 : 0;
+                          return (
+                            <tr key={row.sku}>
+                              <td>
+                                <div style={{ fontWeight: 500, fontSize: '13px' }}>{row.name}</div>
+                                <div className="mono" style={{ fontSize: '11px', color: '#8191a9' }}>{row.sku}</div>
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span className="mono" style={{ fontWeight: 700, fontSize: '15px', color: '#091426', minWidth: '36px' }}>
+                                    {row.totalQty}
+                                  </span>
+                                  {/* Mini progress bar */}
+                                  <div style={{ flex: 1, height: '6px', background: '#eceef0', borderRadius: '3px', minWidth: '60px' }}>
+                                    <div style={{
+                                      height: '100%',
+                                      width: `${pct}%`,
+                                      background: 'linear-gradient(90deg, #091426, #1a4a8a)',
+                                      borderRadius: '3px',
+                                      transition: 'width 0.4s ease',
+                                    }} />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="mono" style={{ fontSize: '12px', color: '#45474c' }}>
+                                {pct.toFixed(1)}%
+                              </td>
+                              <td className="mono" style={{ fontWeight: 600, color: '#006c49', fontSize: '13px' }}>
+                                {formatCurrency(row.totalRevenue)}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                  {rows.length > 0 && (
+                    <div style={{ padding: '10px 16px', background: '#f7f9fb', borderTop: '1px solid #eceef0', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 600, color: '#091426' }}>
+                      <span>Tổng cộng</span>
+                      <span className="mono">{totalQtyAll} sản phẩm</span>
+                    </div>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              );
+            })()}
           </div>
+
 
           {/* Expenses History */}
           <div className="card">
@@ -436,5 +551,46 @@ const styles = {
     lineHeight: 1.4,
     border: '1px solid #ffb4ab',
     marginTop: '8px',
+  },
+};
+
+const tabStyles = {
+  tabTrack: {
+    position: 'relative' as const,
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    background: '#f0f2f5',
+    borderRadius: '10px',
+    padding: '4px',
+    margin: '0 0 16px 0',
+    gap: 0,
+  },
+  tabSlider: {
+    position: 'absolute' as const,
+    top: '4px',
+    left: '4px',
+    width: 'calc(50% - 4px)',
+    height: 'calc(100% - 8px)',
+    background: 'linear-gradient(135deg, #091426, #1e3a5f)',
+    borderRadius: '7px',
+    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    boxShadow: '0 2px 8px rgba(9,20,38,0.25)',
+    pointerEvents: 'none' as const,
+  },
+  tabBtn: {
+    position: 'relative' as const,
+    zIndex: 1,
+    padding: '9px 8px',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontSize: '13px',
+    borderRadius: '7px',
+    transition: 'color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    letterSpacing: '0.01em',
   },
 };
