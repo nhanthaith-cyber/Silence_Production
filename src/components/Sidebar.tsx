@@ -24,7 +24,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
     { key: 'settings', label: 'Cài đặt', icon: Settings },
   ];
 
-  // Phân quyền hiển thị theo Role
+  // Cấp quyền hiển thị theo tài khoản (cho phép cấu hình linh hoạt) hoặc fallback theo Role
   const roleAccess: Record<string, string[]> = {
     admin: ['dashboard', 'production', 'expenses', 'inventory', 'products', 'forecast', 'ai', 'settings'],
     production: ['dashboard', 'production', 'products', 'ai'],
@@ -32,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
     warehouse: ['dashboard', 'inventory', 'products', 'forecast'],
   };
 
-  const allowedPages = roleAccess[user.role] || ['dashboard'];
+  const allowedPages = user.allowedPages || roleAccess[user.role] || ['dashboard'];
   const filteredMenuItems = menuItems.filter((item) => allowedPages.includes(item.key));
 
   const getRoleLabel = (role: string) => {

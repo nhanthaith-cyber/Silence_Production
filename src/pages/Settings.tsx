@@ -12,6 +12,7 @@ export const Settings: React.FC = () => {
     connectionStatus, apiMode, lastSyncTime, syncLogs,
     checkConnection, setApiMode, exportAllData, importAllData, clearData,
     products, productionBatches, sales, expenses,
+    users, addUser, deleteUser
   } = useApp();
 
   // Form state cho API credentials
@@ -33,6 +34,80 @@ export const Settings: React.FC = () => {
   const [excelError, setExcelError] = useState<string | null>(null);
   const [showExcelConfirm, setShowExcelConfirm] = useState(false);
   const [excelSuccess, setExcelSuccess] = useState<string | null>(null);
+
+  // User Management State
+  const [newUsername, setNewUsername] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState('');
+  const [newAllowedPages, setNewAllowedPages] = useState<string[]>(['dashboard']);
+  const [userError, setUserError] = useState('');
+  const [userSuccess, setUserSuccess] = useState('');
+
+  const menuOptions = [
+    { key: 'dashboard', label: 'Tổng quan' },
+    { key: 'production', label: 'Sản xuất' },
+    { key: 'expenses', label: 'Chi phí & Bán hàng' },
+    { key: 'inventory', label: 'Tồn kho' },
+    { key: 'products', label: 'Sản phẩm' },
+    { key: 'forecast', label: 'Dự báo gọi hàng' },
+    { key: 'ai', label: 'Trợ lý AI' },
+    { key: 'settings', label: 'Cài đặt' },
+  ];
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserError('');
+    setUserSuccess('');
+
+    if (!newUsername.trim() || !newName.trim() || !newPassword.trim() || !newRole.trim()) {
+      setUserError('Vui lòng nhập đầy đủ thông tin tài khoản!');
+      return;
+    }
+
+    if (newAllowedPages.length === 0) {
+      setUserError('Vui lòng chọn ít nhất 1 quyền truy cập trang!');
+      return;
+    }
+
+    const res = addUser({
+      username: newUsername.trim().toLowerCase(),
+      password: newPassword.trim(),
+      name: newName.trim(),
+      role: newRole.trim(),
+      allowedPages: newAllowedPages,
+    });
+
+    if (res.success) {
+      setUserSuccess('Đã thêm tài khoản thành công!');
+      setNewUsername('');
+      setNewName('');
+      setNewPassword('');
+      setNewRole('');
+      setNewAllowedPages(['dashboard']);
+    } else {
+      setUserError(res.error || 'Lỗi thêm tài khoản');
+    }
+  };
+
+  const handleDeleteUserClick = (username: string) => {
+    if (confirm(`Bạn có chắc chắn muốn xóa tài khoản "${username}"?`)) {
+      const res = deleteUser(username);
+      if (res.success) {
+        setUserSuccess(`Đã xóa tài khoản "${username}" thành công!`);
+      } else {
+        setUserError(res.error || 'Lỗi khi xóa tài khoản');
+      }
+    }
+  };
+
+  const handlePageCheckboxChange = (pageKey: string) => {
+    setNewAllowedPages(prev =>
+      prev.includes(pageKey)
+        ? prev.filter(p => p !== pageKey)
+        : [...prev, pageKey]
+    );
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
@@ -709,6 +784,164 @@ export const Settings: React.FC = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* User Management Card */}
+        <div className="card">
+          <div className="card-header">
+            <h3>Quản lý tài khoản & Cấp quyền</h3>
+            <span className="badge badge-primary">{users.length} Tài khoản</span>
+          </div>
+
+          {/* List of existing users */}
+          <div className="table-container" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Tên Đăng Nhập</th>
+                  <th>Tên Hiển Thị</th>
+                  <th>Chức Danh</th>
+                  <th>Quyền Truy Cập</th>
+                  <th>Hành Động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.username}>
+                    <td className="mono" style={{ fontWeight: 600, fontSize: '13px' }}>{u.username}</td>
+                    <td style={{ fontWeight: 500 }}>{u.name}</td>
+                    <td>
+                      <span className="badge badge-primary" style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
+                        {u.role === 'admin' ? 'QL Toàn Quyền' : u.role === 'production' ? 'QL Sản Xuất' : u.role === 'finance' ? 'QL Tài Chính' : u.role === 'warehouse' ? 'Thủ Kho' : u.role}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {u.allowedPages.map((page) => (
+                          <span key={page} style={{ fontSize: '10px', padding: '2px 6px', background: '#eceef0', borderRadius: '4px', color: '#1e293b', fontWeight: 600 }}>
+                            {page === 'dashboard' ? 'Tổng quan' :
+                             page === 'production' ? 'Sản xuất' :
+                             page === 'expenses' ? 'Chi phí' :
+                             page === 'inventory' ? 'Tồn kho' :
+                             page === 'products' ? 'Sản phẩm' :
+                             page === 'forecast' ? 'Dự báo' :
+                             page === 'ai' ? 'AI' : 'Cài đặt'}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUserClick(u.username)}
+                        disabled={u.username === 'admin'}
+                        className="btn btn-danger"
+                        style={{ padding: '4px 8px', fontSize: '11px', minWidth: 'auto', cursor: u.username === 'admin' ? 'not-allowed' : 'pointer' }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Create new user form */}
+          <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '16px', marginTop: '8px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '12px', color: '#091426' }}>Thêm tài khoản mới</h4>
+            
+            <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '11px' }}>Tên đăng nhập</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: nhanvienmay"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    required
+                    style={{ padding: '8px 10px', fontSize: '13px' }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label style={{ fontSize: '11px' }}>Mật khẩu</label>
+                  <input
+                    type="password"
+                    placeholder="Mật khẩu"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    style={{ padding: '8px 10px', fontSize: '13px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="form-group">
+                  <label style={{ fontSize: '11px' }}>Tên hiển thị</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: Nguyễn Văn A"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    required
+                    style={{ padding: '8px 10px', fontSize: '13px' }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label style={{ fontSize: '11px' }}>Chức danh / Vai trò</label>
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: Nhân viên may"
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    required
+                    style={{ padding: '8px 10px', fontSize: '13px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Checkbox list of allowed pages */}
+              <div className="form-group">
+                <label style={{ fontSize: '11px', marginBottom: '4px' }}>Cấp quyền truy cập các trang</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  {menuOptions.map((opt) => {
+                    const isChecked = newAllowedPages.includes(opt.key);
+                    return (
+                      <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', textTransform: 'none', fontSize: '13px', fontWeight: 500, color: '#334155', cursor: 'pointer', margin: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handlePageCheckboxChange(opt.key)}
+                          style={{ width: 'auto', cursor: 'pointer', margin: 0 }}
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {userError && (
+                <div style={{ ...styles.errorAlert, padding: '8px 10px', fontSize: '12px' }}>
+                  <AlertCircle size={14} />
+                  <span>{userError}</span>
+                </div>
+              )}
+
+              {userSuccess && (
+                <div style={{ ...styles.successAlert, padding: '8px 10px', fontSize: '12px' }}>
+                  <CheckCircle size={14} />
+                  <span>{userSuccess}</span>
+                </div>
+              )}
+
+              <button type="submit" className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '13px', backgroundColor: '#091426', marginTop: '4px' }}>
+                Tạo tài khoản & Cấp quyền
+              </button>
+            </form>
           </div>
         </div>
       </div>

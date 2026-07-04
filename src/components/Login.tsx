@@ -1,31 +1,14 @@
 import React, { useState } from 'react';
 import type { User } from '../types';
 import { Lock, User as UserIcon, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useApp } from '../hooks/useApp';
 
 interface LoginProps {
   onLogin: (user: User) => void;
 }
 
-export const PREDEFINED_USERS: Record<string, { password: string; user: User }> = {
-  admin: {
-    password: 'silence@2026',
-    user: { username: 'admin', name: 'Quản trị viên', role: 'admin' },
-  },
-  production: {
-    password: 'production@2026',
-    user: { username: 'production', name: 'Quản lý Sản xuất', role: 'production' },
-  },
-  finance: {
-    password: 'finance@2026',
-    user: { username: 'finance', name: 'Quản lý Tài chính', role: 'finance' },
-  },
-  warehouse: {
-    password: 'warehouse@2026',
-    user: { username: 'warehouse', name: 'Thủ kho', role: 'warehouse' },
-  },
-};
-
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const { users } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -36,14 +19,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
 
     const cleanUsername = username.trim().toLowerCase();
-    const account = PREDEFINED_USERS[cleanUsername];
+    const account = users.find((u) => u.username === cleanUsername);
 
     if (!account || account.password !== password) {
       setError('Tài khoản hoặc mật khẩu không chính xác!');
       return;
     }
 
-    onLogin(account.user);
+    onLogin(account);
   };
 
   return (

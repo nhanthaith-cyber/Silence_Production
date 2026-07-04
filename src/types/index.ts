@@ -119,14 +119,22 @@ export interface AppContextType {
   exportAllData: () => string;
   importAllData: (json: string) => { success: boolean; error?: string };
   clearData: () => void;
-}
 
-export type UserRole = 'admin' | 'production' | 'finance' | 'warehouse';
+  // User Management
+  users: UserWithPassword[];
+  addUser: (user: UserWithPassword) => { success: boolean; error?: string };
+  deleteUser: (username: string) => { success: boolean; error?: string };
+}
 
 export interface User {
   username: string;
   name: string;
-  role: UserRole;
+  role: string;
+  allowedPages: string[];
+}
+
+export interface UserWithPassword extends User {
+  password?: string;
 }
 
 // ============================

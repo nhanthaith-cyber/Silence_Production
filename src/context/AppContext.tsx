@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import type {
   Product, ProductionBatch, ProductionBatchItem, ProductionStage, Sale, Expense,
-  AppContextType, NhanhApiMode, ConnectionStatus, SyncLog
+  AppContextType, NhanhApiMode, ConnectionStatus, SyncLog, UserWithPassword
 } from '../types';
 import { defaultProducts, defaultBatches, defaultSales, defaultExpenses } from '../data/defaultData';
 import { getTodayISO, generateId } from '../utils/formatters';
@@ -30,11 +30,43 @@ const migrateBatches = (batches: ProductionBatch[]): ProductionBatch[] =>
     };
   });
 
+const defaultUsers: UserWithPassword[] = [
+  {
+    username: 'admin',
+    password: 'silence@2026',
+    name: 'Quản trị viên',
+    role: 'admin',
+    allowedPages: ['dashboard', 'production', 'expenses', 'inventory', 'products', 'forecast', 'ai', 'settings'],
+  },
+  {
+    username: 'production',
+    password: 'production@2026',
+    name: 'Quản lý Sản xuất',
+    role: 'production',
+    allowedPages: ['dashboard', 'production', 'products', 'ai'],
+  },
+  {
+    username: 'finance',
+    password: 'finance@2026',
+    name: 'Quản lý Tài chính',
+    role: 'finance',
+    allowedPages: ['dashboard', 'expenses', 'settings'],
+  },
+  {
+    username: 'warehouse',
+    password: 'warehouse@2026',
+    name: 'Thủ kho',
+    role: 'warehouse',
+    allowedPages: ['dashboard', 'inventory', 'products', 'forecast'],
+  },
+];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [productionBatches, setProductionBatches] = useState<ProductionBatch[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [users, setUsers] = useState<UserWithPassword[]>([]);
 
   // Connection & Sync State
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('checking');
@@ -45,6 +77,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Load from LocalStorage or seed defaults
   useEffect(() => {
     try {
+      const localUsers = localStorage.getItem('silence_prod_users');
+      if (localUsers) setUsers(JSON.parse(localUsers));
+      else {
+        setUsers(defaultUsers);
+        localStorage.setItem('silence_prod_users', JSON.stringify(defaultUsers));
+      }
+
       const localProducts = localStorage.getItem('silence_prod_products');
       const localBatches = localStorage.getItem('silence_prod_batches');
       const localSales = localStorage.getItem('silence_prod_sales');
@@ -501,10 +540,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('silence_prod_batches');
     localStorage.removeItem('silence_prod_sales');
     localStorage.removeItem('silence_prod_expenses');
+    localStorage.removeItem('silence_prod_users');
     setProducts(defaultProducts);
     setProductionBatches(defaultBatches);
     setSales(defaultSales);
     setExpenses(defaultExpenses);
+    setUsers(defaultUsers);
+  };
+
+  const addUser = (newUser: UserWithPassword) => {
+    const usernameClean = newUser.username.trim().toLowerCase();
+    if (!usernameClean) return { success: false, error: 'Tên đăng nhập không được để trống!' };
+    if (users.some((u) => u.username === usernameClean)) {
+      return { success: false, error: 'Tên đăng nhập đã tồn tại!' };
+    }
+    const updated = [...users, { ...newUser, username: usernameClean }];
+    setUsers(updated);
+    saveToLocal('silence_prod_users', updated);
+    return { success: true };
+  };
+
+  const deleteUser = (username: string) => {
+    const usernameClean = username.trim().toLowerCase();
+    if (usernameClean === 'admin') {
+      return { success: false, error: 'Không thể xóa tài khoản Quản trị viên hệ thống (admin)!' };
+    }
+    const updated = users.filter((u) => u.username !== usernameClean);
+    setUsers(updated);
+    saveToLocal('silence_prod_users', updated);
+    return { success: true };
   };
 
   return (
@@ -534,6 +598,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         exportAllData: exportAllDataFn,
         importAllData,
         clearData,
+        users,
+        addUser,
+        deleteUser,
       }}
     >
       {children}
