@@ -67,16 +67,15 @@ Tài liệu này xác định chi tiết các yêu cầu chức năng và phi ch
 - Hỗ trợ OAuth flow để lấy Access Token tự động.
 - Test kết nối, hiển thị trạng thái (Live / Sandbox / Lỗi).
 
-#### 6b. Cập nhật dữ liệu qua Excel (Tạm thời thay thế API)
-- **Tải Template Excel:** Xuất file `.xlsx` mẫu trống có header + 1 dòng ví dụ cho 4 sheet (Products, Sales, Expenses, ProductionBatches).
-- **Xuất dữ liệu hiện tại:** Export toàn bộ dữ liệu hệ thống ra file `.xlsx` để chỉnh sửa offline.
-- **Import từ Excel:**
-  - Upload file `.xlsx` → hệ thống parse và validate từng dòng.
-  - Hiển thị **preview** trước khi xác nhận (số dòng đọc được, cảnh báo dữ liệu sai định dạng).
-  - Chọn chế độ import:
-    - **Ghi đè (Overwrite):** Xóa dữ liệu cũ, thay hoàn toàn bằng dữ liệu từ Excel.
-    - **Thêm mới (Append):** Giữ dữ liệu cũ, chỉ thêm các bản ghi không trùng ID/SKU.
-- **Backup JSON:** Tải xuống hoặc restore dữ liệu dưới định dạng JSON.
+#### 6b. Cập nhật dữ liệu qua Excel (Chuyên biệt cho từng trang)
+- **Tích hợp trực tiếp:** Các tính năng Excel được chuyển trực tiếp vào từng trang tương ứng (Sản phẩm, Sản xuất, Chi phí & Bán hàng, Tồn kho, Dự kiến gọi hàng) thay vì chỉ ở trang Cài đặt.
+- **Tải Template Excel:** Mỗi trang cung cấp template Excel mẫu riêng phù hợp với cấu trúc dữ liệu của trang đó.
+- **Xuất báo cáo Excel:** Cho phép export dữ liệu hiện tại của từng phân hệ (kể cả báo cáo Tồn kho và Dự phóng gọi hàng).
+- **Import cập nhật từ Excel:**
+  - Hỗ trợ tải file Excel lên, parse và hiển thị modal preview số lượng dòng đọc được cùng cảnh báo (nếu có).
+  - Chọn chế độ import: **Ghi đè** (Overwrite) hoặc **Thêm mới** (Append).
+  - **Quy tắc Sandbox:** Trong chế độ Sandbox, khi import danh sách Sản phẩm, hệ thống sẽ tự động cập nhật số lượng tồn kho khả dụng (`nhanhStock`) cho sản phẩm đó từ file Excel. Ở chế độ Live, giá trị này được bỏ qua và quản lý bởi API Nhanh.vn.
+- **Backup JSON:** Vẫn giữ nguyên tính năng tải xuống/restore toàn bộ dữ liệu dưới dạng JSON ở mục Cài đặt.
 
 
 

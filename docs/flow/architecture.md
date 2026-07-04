@@ -1,4 +1,4 @@
-﻿# Kien truc ung dung - Silence Production Dashboard
+# Kien truc ung dung - Silence Production Dashboard
 
 Tai lieu nay mo ta chi tiet kien truc client-side, cach quan ly du lieu (state) va luong hoat dong cua ung dung **Silence Production Dashboard**.
 
@@ -78,25 +78,25 @@ Toan bo du lieu cua he thong duoc quan ly thong qua `AppContext` chua cac tap du
 Tinh nang nay cho phep cap nhat du lieu **offline** ma khong can ket noi Nhanh.vn API.
 
 ```
-1. User tai Template Excel (.xlsx) tu Settings
+1. User truy cập trực tiếp trang nghiệp vụ (Products, Production, Expenses, Inventory, Forecast)
       |
       v
-2. Dien du lieu vao 4 sheet: Products | Sales | Expenses | ProductionBatches
+2. Tải template mẫu riêng của trang đó, hoặc xuất danh sách hiện tại ra Excel (.xlsx)
       |
       v
-3. Upload file --> excelDataService.importFromExcel(file)
+3. Sửa đổi thông tin ngoại tuyến và tải lên tại chính trang đó
       |
       v
-4. Validate tung dong, sinh ExcelImportResult (co warnings)
+4. Hệ thống gọi `excelDataService.importFromExcel(file)` để parse và validate dữ liệu
       |
       v
-5. UI hien preview: so dong doc duoc + danh sach canh bao
+5. Hiển thị modal preview số dòng đọc được kèm cảnh báo (nếu có)
       |
       v
-6. User chon che do: GHI DE (xoa data cu) | THEM MOI (giu data cu)
+6. Chọn chế độ cập nhật: Ghi đè (Overwrite) hoặc Thêm mới (Append)
       |
       v
-7. Xac nhan --> importAllData() --> LocalStorage cap nhat --> UI render lai
+7. Xác nhận -> gọi `importAllData()` cập nhật LocalStorage -> Trình duyệt tự tải lại dữ liệu mới
 ```
 
 **Tach biet voi Nhanh.vn:** `excelDataService.ts` hoan toan doc lap voi `nhanhService.ts`.
