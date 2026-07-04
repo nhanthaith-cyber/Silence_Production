@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../hooks/useApp';
 import { formatNumber } from '../utils/formatters';
 import { Boxes, PackagePlus, ShoppingBag, AlertTriangle, CheckCircle2, RefreshCw, FileSpreadsheet, FileDown, Upload, AlertCircle } from 'lucide-react';
@@ -78,48 +78,86 @@ export const Inventory: React.FC = () => {
 
 
 
+  interface InventoryItem {
+    sku: string;
+    name: string;
+    inProduction: number;
+    sold: number;
+    available: number;
+    isLowStock: boolean;
+  }
+
+  // State for search and pagination
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
+
   // Calculate inventory metrics by product
-  const inventoryData = products.map((prod) => {
-    // 1. In Production = Running batches quantity
-    const inProduction = productionBatches
-      .filter((b) => b.status === 'running')
-      .reduce((sum, b) => {
-        const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
-        return sum + itemQty;
-      }, 0);
+  const inventoryData: InventoryItem[] = useMemo(() => {
+    return products.map((prod) => {
+      // 1. In Production = Running batches quantity
+      const inProduction = productionBatches
+        .filter((b) => b.status === 'running')
+        .reduce((sum, b) => {
+          const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
+          return sum + itemQty;
+        }, 0);
 
-    // 2. Ready (total produced) = Completed batches quantity
-    const totalProduced = productionBatches
-      .filter((b) => b.status === 'completed')
-      .reduce((sum, b) => {
-        const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
-        return sum + itemQty;
-      }, 0);
+      // 2. Ready (total produced) = Completed batches quantity
+      const totalProduced = productionBatches
+        .filter((b) => b.status === 'completed')
+        .reduce((sum, b) => {
+          const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
+          return sum + itemQty;
+        }, 0);
 
-    // 3. Sold = Sales quantity
-    const sold = sales
-      .filter((s) => s.productSku === prod.sku)
-      .reduce((sum, s) => sum + s.quantity, 0);
+      // 3. Sold = Sales quantity
+      const sold = sales
+        .filter((s) => s.productSku === prod.sku)
+        .reduce((sum, s) => sum + s.quantity, 0);
 
-    // 4. Available = Tồn kho thực tế
-    // Ưu tiên dùng số lượng nhanhStock đồng bộ từ Nhanh.vn (nếu có).
-    // Nếu chưa đồng bộ, dùng công thức nội bộ = Tổng sản xuất xong - Đã bán lẻ.
-    const available = prod.nhanhStock !== undefined ? prod.nhanhStock : (totalProduced - sold);
+      // 4. Available = Tồn kho thực tế
+      // Ưu tiên dùng số lượng nhanhStock đồng bộ từ Nhanh.vn (nếu có).
+      // Nếu chưa đồng bộ, dùng công thức nội bộ = Tổng sản xuất xong - Đã bán lẻ.
+      const available = prod.nhanhStock !== undefined ? prod.nhanhStock : (totalProduced - sold);
 
-    return {
-      sku: prod.sku,
-      name: prod.name,
-      inProduction,
-      sold,
-      available,
-      isLowStock: available < 20,
-    };
-  });
+      return {
+        sku: prod.sku,
+        name: prod.name,
+        inProduction,
+        sold,
+        available,
+        isLowStock: available < 20,
+      };
+    });
+  }, [products, productionBatches, sales]);
 
-  // Calculate totals
-  const totalAvailable = inventoryData.reduce((sum, d) => sum + d.available, 0);
-  const totalInProduction = inventoryData.reduce((sum, d) => sum + d.inProduction, 0);
-  const totalSold = inventoryData.reduce((sum, d) => sum + d.sold, 0);
+  // Filter inventoryData based on search term
+  const filteredData = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return inventoryData;
+    return inventoryData.filter(
+      (item: InventoryItem) => item.sku.toLowerCase().includes(term) || item.name.toLowerCase().includes(term)
+    );
+  }, [inventoryData, searchTerm]);
+
+  // Paginated data
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredData, currentPage]);
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+
+  // Calculate totals (always on total inventoryData)
+  const totalAvailable = useMemo(() => inventoryData.reduce((sum: number, d: InventoryItem) => sum + d.available, 0), [inventoryData]);
+  const totalInProduction = useMemo(() => inventoryData.reduce((sum: number, d: InventoryItem) => sum + d.inProduction, 0), [inventoryData]);
+  const totalSold = useMemo(() => inventoryData.reduce((sum: number, d: InventoryItem) => sum + d.sold, 0), [inventoryData]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="page-container fade-in">
@@ -310,13 +348,49 @@ export const Inventory: React.FC = () => {
       )}
 
       {/* Inventory Table card */}
-      <div className="card">
-        <div className="card-header">
-          <h3>Chi tiết số lượng tồn kho theo SKU</h3>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card-header" style={{ padding: '16px 20px', borderBottom: '1px solid #eceef0' }}>
+          <h3 style={{ margin: 0 }}>Chi tiết số lượng tồn kho theo SKU</h3>
           <span style={{ fontSize: '12px', color: '#8191a9', fontWeight: 600 }}>Cảnh báo mức tồn thấp: &lt; 20 SP</span>
         </div>
 
-        <div className="table-container">
+        {/* Search Bar */}
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid #eceef0', display: 'flex', gap: '12px', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>Tìm kiếm SKU:</span>
+          <input
+            type="text"
+            placeholder="Nhập mã SKU hoặc tên sản phẩm để tìm..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+            style={{
+              flex: 1,
+              padding: '6px 12px',
+              fontSize: '13px',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              outline: 'none',
+              backgroundColor: '#ffffff',
+            }}
+          />
+          {searchTerm && (
+            <button
+              onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#1e293b',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                textDecoration: 'underline'
+              }}
+            >
+              Xóa lọc
+            </button>
+          )}
+        </div>
+
+        <div className="table-container" style={{ margin: 0, border: 'none', borderRadius: 0 }}>
           <table>
             <thead>
               <tr>
@@ -330,14 +404,14 @@ export const Inventory: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {inventoryData.length === 0 ? (
+              {filteredData.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', color: '#8191a9', padding: '24px' }}>
-                    Chưa có sản phẩm nào trong hệ thống.
+                    {searchTerm ? 'Không tìm thấy sản phẩm nào khớp với từ khóa tìm kiếm.' : 'Chưa có sản phẩm nào trong hệ thống.'}
                   </td>
                 </tr>
               ) : (
-                inventoryData.map((data) => (
+                paginatedData.map((data) => (
                   <tr key={data.sku}>
                     <td className="mono" style={{ fontWeight: 600 }}>{data.sku}</td>
                     <td style={{ fontWeight: 500 }}>{data.name}</td>
@@ -385,6 +459,61 @@ export const Inventory: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 20px',
+            borderTop: '1px solid #eceef0',
+            backgroundColor: '#f8fafc'
+          }}>
+            <span style={{ fontSize: '12px', color: '#64748b' }}>
+              Hiển thị {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredData.length)} trên tổng số {filteredData.length} SKU
+            </span>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                className="btn btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '12px', minWidth: 'auto', cursor: currentPage === 1 ? 'not-allowed' : 'pointer' }}
+              >
+                Trước
+              </button>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className="btn"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '12px',
+                    minWidth: '28px',
+                    backgroundColor: currentPage === page ? '#091426' : '#ffffff',
+                    color: currentPage === page ? '#ffffff' : '#091426',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    fontWeight: currentPage === page ? 700 : 500
+                  }}
+                >
+                  {page}
+                </button>
+              ))}
+
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                className="btn btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '12px', minWidth: 'auto', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Global CSS spinner for mock sync button */}
