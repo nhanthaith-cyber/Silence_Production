@@ -121,13 +121,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
 const styles = {
   sidebar: {
     width: '240px',
-    minHeight: '100vh',
+    height: '100vh',
     backgroundColor: '#091426',
     display: 'flex',
     flexDirection: 'column' as const,
     padding: '0',
-    position: 'sticky' as const,
+    position: 'fixed' as const,
     top: 0,
+    left: 0,
+    zIndex: 1000,
   },
   logoSection: {
     display: 'flex',

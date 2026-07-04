@@ -80,7 +80,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 0',
+    padding: '16px 32px',
     borderBottom: '1px solid #eceef0',
     marginBottom: '24px',
   } as React.CSSProperties,
