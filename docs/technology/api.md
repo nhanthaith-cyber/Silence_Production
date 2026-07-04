@@ -95,3 +95,47 @@ https://pos.open.nhanh.vn/v3.0/app/getaccesstoken?appId={appId}
 - **Môi trường Production (GitHub Pages):** Định tuyến yêu cầu qua cổng CORS Proxy của `corsproxy.io`:
   `https://corsproxy.io/?url=https://pos.open.nhanh.vn/v3.0/...`
   để vượt qua chính sách CORS của trình duyệt mà không cần sử dụng máy chủ backend riêng biệt.
+
+---
+
+### 5. Dịch vụ Excel (Excel Data Service)
+
+File: `src/services/excelDataService.ts` — Hoàn toàn **độc lập** với Nhanh.vn, chạy client-side qua thư viện **SheetJS (xlsx)**.
+
+#### 🔸 `exportToExcel(products, batches, sales, expenses)`
+- **Tác động:** Tạo và tải xuống file `.xlsx` ngay trên trình duyệt.
+- **Cấu trúc file:**
+
+| Sheet | Các cột |
+|-------|---------|
+| `Products` | SKU, Ten san pham, Gia goc (VND), Gia ban (VND), Ton kho Nhanh.vn |
+| `Sales` | ID, SKU, So luong, Don gia (VND), Ngay ban, Nguon |
+| `Expenses` | ID, Danh muc, So tien (VND), Ngay, Ghi chu |
+| `ProductionBatches` | ID, Trang thai, Giai doan, Ngay tao, Ngay muc tieu, San pham (SKU:SL,...) |
+| `HuongDan` | Hướng dẫn điền dữ liệu |
+
+#### 🔸 `generateExcelTemplate()`
+- **Tác động:** Tải xuống file `.xlsx` mẫu trống, có 1 dòng ví dụ mỗi sheet.
+- **Mục đích:** Người dùng tải về, điền dữ liệu offline, rồi import lại.
+
+#### 🔸 `importFromExcel(file: File): Promise<ExcelImportResult>`
+- **Tham số:** File `.xlsx` hoặc `.xls` từ input của người dùng.
+- **Trả về:** `ExcelImportResult` gồm:
+  - `products[]`, `sales[]`, `expenses[]`, `productionBatches[]` — dữ liệu đã parse.
+  - `warnings[]` — danh sách cảnh báo các dòng bị bỏ qua hoặc sai định dạng.
+  - `parsedAt` — timestamp thời điểm parse.
+  - `sheetsFound[]` — tên các sheet đọc được.
+- **Validation:**
+  - `Products`: SKU và Tên là bắt buộc. SKU tự động chuyển UPPERCASE.
+  - `Sales`: Nguồn phải thuộc `shopee | tiktok | offline | manual | nhanh_vn`.
+  - `Expenses`: Danh mục phải thuộc `labor | rent | ads | shipping | material | other`.
+  - `ProductionBatches`: Sản phẩm định dạng `SKU1:100, SKU2:50` (phân tách bằng dấu phẩy).
+  - Dữ liệu sai định dạng → tự động fallback về giá trị mặc định + ghi vào `warnings[]`.
+
+#### Chế độ Import
+
+| Chế độ | Hành vi |
+|--------|---------|
+| `overwrite` | Xóa toàn bộ dữ liệu cũ, thay bằng dữ liệu từ Excel |
+| `append` | Giữ dữ liệu cũ, chỉ thêm bản ghi không trùng ID/SKU |
+

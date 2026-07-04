@@ -60,6 +60,26 @@ Tài liệu này xác định chi tiết các yêu cầu chức năng và phi ch
 - **Quản lý danh sách sản phẩm:**
   - Nhập thông tin: Mã SKU (Định dạng viết hoa, không dấu, ví dụ: `TS-SILENCE-01`), Tên sản phẩm, Chi phí sản xuất định mức (Cost per unit - dùng để tính giá vốn hàng bán), Giá bán đề xuất.
 
+### 6. Cài đặt & Quản lý dữ liệu (Settings)
+
+#### 6a. Kết nối Nhanh.vn API
+- Cấu hình App ID, Business ID, Access Token, Secret Key.
+- Hỗ trợ OAuth flow để lấy Access Token tự động.
+- Test kết nối, hiển thị trạng thái (Live / Sandbox / Lỗi).
+
+#### 6b. Cập nhật dữ liệu qua Excel (Tạm thời thay thế API)
+- **Tải Template Excel:** Xuất file `.xlsx` mẫu trống có header + 1 dòng ví dụ cho 4 sheet (Products, Sales, Expenses, ProductionBatches).
+- **Xuất dữ liệu hiện tại:** Export toàn bộ dữ liệu hệ thống ra file `.xlsx` để chỉnh sửa offline.
+- **Import từ Excel:**
+  - Upload file `.xlsx` → hệ thống parse và validate từng dòng.
+  - Hiển thị **preview** trước khi xác nhận (số dòng đọc được, cảnh báo dữ liệu sai định dạng).
+  - Chọn chế độ import:
+    - **Ghi đè (Overwrite):** Xóa dữ liệu cũ, thay hoàn toàn bằng dữ liệu từ Excel.
+    - **Thêm mới (Append):** Giữ dữ liệu cũ, chỉ thêm các bản ghi không trùng ID/SKU.
+- **Backup JSON:** Tải xuống hoặc restore dữ liệu dưới định dạng JSON.
+
+
+
 ---
 
 ## 🎨 Yêu cầu thiết kế (UI/UX - Industrial Precision)

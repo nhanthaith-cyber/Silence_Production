@@ -1,62 +1,116 @@
-# Kiến trúc ứng dụng - Silence Production Dashboard
+﻿# Kien truc ung dung - Silence Production Dashboard
 
-Tài liệu này mô tả chi tiết kiến trúc client-side, cách quản lý dữ liệu (state) và luồng hoạt động của ứng dụng **Silence Production Dashboard**.
+Tai lieu nay mo ta chi tiet kien truc client-side, cach quan ly du lieu (state) va luong hoat dong cua ung dung **Silence Production Dashboard**.
 
 ---
 
-## 🏗️ Tổng quan Kiến trúc (Vite + React SPA)
+## Tong quan Kien truc (Vite + React SPA)
 
-Ứng dụng được xây dựng dưới dạng Single Page Application (SPA) chạy hoàn toàn trên trình duyệt của người dùng. Để phục vụ việc thử nghiệm nhanh và lưu trữ bền vững, chúng ta kết hợp **React Context API** và **HTML5 LocalStorage**.
+Ung dung duoc xay dung duoi dang Single Page Application (SPA) chay hoan toan tren trinh duyet cua nguoi dung. De phuc vu viec thu nghiem nhanh va luu tru ben vung, chung ta ket hop **React Context API** va **HTML5 LocalStorage**.
 
 ```mermaid
 graph TD
-    UI[React Components / Pages] -->|Actions: addProduct, advanceStage, syncSales| State[React Context: AppState]
-    State -->|Trạng thái React thay đổi| UI
-    State -->|Đồng bộ tự động| LS[(Browser LocalStorage)]
-    LS -->|Khởi tạo lúc load trang| State
+    UI[React Components / Pages] -->|Actions: addProduct, advanceStage, syncSales, importExcel| State[React Context: AppState]
+    State -->|Trang thai React thay doi| UI
+    State -->|Dong bo tu dong| LS[(Browser LocalStorage)]
+    LS -->|Khoi tao luc load trang| State
+    Excel[File .xlsx nguoi dung upload] -->|importFromExcel| ExcelSvc[excelDataService.ts]
+    ExcelSvc -->|ExcelImportResult preview| UI
+    UI -->|Xac nhan import| State
+    State -->|exportToExcel| Excel2[File .xlsx tai xuong]
+    Nhanh[Nhanh.vn API v3.0] -->|syncSalesFromNhanh| State
+    State -->|syncStockToNhanh| Nhanh
 ```
 
 ---
 
-## 🧩 Cấu trúc các thành phần (Component Hierarchy)
-
-Ứng dụng tuân thủ mô hình phân cấp component chặt chẽ nhằm tối ưu hóa khả năng tái sử dụng:
+## Cau truc cac thanh phan (Component Hierarchy)
 
 ```text
 src/
-├── main.tsx                # Điểm khởi đầu (Entrypoint)
-├── App.tsx                 # Quản lý routing và Layout chính
-├── context/
-│   └── AppContext.tsx      # Quản lý State tập trung (Context + Reducer)
-├── components/
-│   ├── Sidebar.tsx         # Thanh điều hướng trái (240px)
-│   ├── Header.tsx          # Tiêu đề trang, nút Sync trạng thái
-│   └── DashboardCharts.tsx # Biểu đồ SVG/Recharts tùy chỉnh
-└── pages/
-    ├── Dashboard.tsx       # Phân tích tài chính, thống kê KPI
-    ├── Production.tsx      # Bảng điều khiển tiến độ sản xuất 5 bước
-    ├── Expenses.tsx        # Nhập chi phí nhanh & giả lập đồng bộ đơn hàng
-    ├── Inventory.tsx       # Quản lý tồn kho khả dụng/đang sản xuất/đã bán
-    └── Products.tsx        # Quản lý danh mục sản phẩm (SKU)
++-- main.tsx                      # Diem khoi dau (Entrypoint)
++-- App.tsx                       # Quan ly routing va Layout chinh
++-- context/
+|   +-- AppContext.tsx            # Quan ly State tap trung (Context + Reducer)
++-- services/
+|   +-- nhanhService.ts           # Ket noi API Nhanh.vn v3.0 (doc lap, giu nguyen)
+|   +-- nhanhDataMapper.ts        # Map du lieu Nhanh.vn -> kieu noi bo
+|   +-- excelDataService.ts       # [MOI] Doc/ghi file Excel (.xlsx) qua SheetJS
+|   +-- productionDataService.ts  # KPI san xuat, export/import JSON
++-- components/
+|   +-- Sidebar.tsx               # Thanh dieu huong trai (240px)
+|   +-- Header.tsx                # Tieu de trang, nut Sync trang thai
+|   +-- DashboardCharts.tsx       # Bieu do SVG/Recharts tuy chinh
++-- pages/
+    +-- Dashboard.tsx             # Phan tich tai chinh, thong ke KPI
+    +-- Production.tsx            # Bang dieu khien tien do san xuat 5 buoc
+    +-- Expenses.tsx              # Nhap chi phi nhanh & dong bo don hang
+    +-- Inventory.tsx             # Quan ly ton kho kha dung/dang SX/da ban
+    +-- Products.tsx              # Quan ly danh muc san pham (SKU)
+    +-- Forecast.tsx              # Du bao goi hang / san xuat
+    +-- Settings.tsx              # Cau hinh API, quan ly du lieu, Excel import/export
 ```
 
 ---
 
-## 💾 Quản lý trạng thái (State Management)
+## Quan ly trang thai (State Management)
 
-Toàn bộ dữ liệu của hệ thống được quản lý thông qua `AppContext` chứa các tập dữ liệu sau:
-- **`products`**: Danh sách sản phẩm khả dụng trong hệ thống.
-- **`productionBatches`**: Danh sách các lô hàng đang hoặc đã sản xuất, kèm theo trạng thái công đoạn hiện tại.
-- **`expenses`**: Các khoản chi phí vận hành nhập thêm.
-- **`sales`**: Các đơn hàng bán (được tạo thủ công hoặc đồng bộ từ kênh bán lẻ).
+Toan bo du lieu cua he thong duoc quan ly thong qua `AppContext` chua cac tap du lieu sau:
+- **`products`**: Danh sach san pham kha dung trong he thong.
+- **`productionBatches`**: Danh sach cac lo hang dang hoac da san xuat, kem theo trang thai cong doan hien tai.
+- **`expenses`**: Cac khoan chi phi van hanh nhap them.
+- **`sales`**: Cac don hang ban (duoc tao thu cong hoac dong bo tu kenh ban le).
 
-### Quy trình cập nhật dữ liệu (Data Update Flow)
-1. Người dùng thực hiện một hành động (ví dụ: chuyển trạng thái lô hàng sản xuất sang "Đóng gói & Nhập kho").
-2. Component gọi hàm dispatch của Context: `advanceBatchStage(batchId)`.
-3. State của lô hàng chuyển sang trạng thái mới. Đồng thời, số lượng tồn kho `Available` của sản phẩm đó được cộng thêm.
-4. Trạng thái mới được ghi đè vào `LocalStorage`.
-5. React render lại giao diện, các biểu đồ tự động cập nhật số liệu mới nhất.
-6. Tự động cập nhật kéo đơn hàng tạo từ sàn Thương mại điện từ về 
-7. tăng số lượng cập nhật tồn kho lên 3000 SKU cùng lúc
-8. Tính toán lãi lỗ dựa trên chi phí và doanh thu theo từng, ngày, tuần, tháng
-9.
+### Quy trinh cap nhat du lieu (Data Update Flow)
+1. Nguoi dung thuc hien mot hanh dong (vi du: chuyen trang thai lo hang san xuat sang "Dong goi & Nhap kho").
+2. Component goi ham dispatch cua Context: `advanceBatchStage(batchId)`.
+3. State cua lo hang chuyen sang trang thai moi. Dong thoi, so luong ton kho `Available` cua san pham do duoc cong them.
+4. Trang thai moi duoc ghi de vao `LocalStorage`.
+5. React render lai giao dien, cac bieu do tu dong cap nhat so lieu moi nhat.
+6. Tu dong keo don hang tu san Thuong mai dien tu (Nhanh.vn API) ve dinh ky moi 5 phut khi o che do Live.
+7. Ho tro cap nhat du lieu hang loat qua file Excel (toan bo SKU cung luc).
+8. Tinh toan lai lo dua tren chi phi va doanh thu theo tung ngay, tuan, thang.
+
+---
+
+## Luong cap nhat du lieu qua Excel
+
+Tinh nang nay cho phep cap nhat du lieu **offline** ma khong can ket noi Nhanh.vn API.
+
+```
+1. User tai Template Excel (.xlsx) tu Settings
+      |
+      v
+2. Dien du lieu vao 4 sheet: Products | Sales | Expenses | ProductionBatches
+      |
+      v
+3. Upload file --> excelDataService.importFromExcel(file)
+      |
+      v
+4. Validate tung dong, sinh ExcelImportResult (co warnings)
+      |
+      v
+5. UI hien preview: so dong doc duoc + danh sach canh bao
+      |
+      v
+6. User chon che do: GHI DE (xoa data cu) | THEM MOI (giu data cu)
+      |
+      v
+7. Xac nhan --> importAllData() --> LocalStorage cap nhat --> UI render lai
+```
+
+**Tach biet voi Nhanh.vn:** `excelDataService.ts` hoan toan doc lap voi `nhanhService.ts`.
+Khi co ket noi Nhanh.vn tro lai, chi can goi lai cac ham sync ma khong xung dot du lieu.
+
+---
+
+## Cac kieu du lieu chinh (Type System)
+
+| Type | Mo ta |
+|------|-------|
+| `Product` | San pham: sku, name, defaultCost, defaultPrice, nhanhStock |
+| `ProductionBatch` | Lo san xuat: id, items[], currentStage, status, targetDate |
+| `Sale` | Don hang: id, productSku, quantity, unitPrice, saleDate, source |
+| `Expense` | Chi phi: id, category, amount, expenseDate, notes |
+| `ExcelImportResult` | [MOI] Ket qua parse Excel: products[], sales[], expenses[], batches[], warnings[] |
+| `ExcelImportMode` | [MOI] Che do import: overwrite hoac append |
