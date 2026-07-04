@@ -10,7 +10,7 @@ import {
 import type { ExcelImportResult } from '../types';
 
 export const Products: React.FC = () => {
-  const { products, addProduct, deleteProduct, productionBatches, sales, syncStockFromNhanh, syncStockToNhanh, importAllData, expenses } = useApp();
+  const { products, addProduct, deleteProduct, productionBatches, sales, syncStockFromNhanh, syncStockToNhanh, importAllData, expenses, apiMode } = useApp();
 
   // Form states
   const [sku, setSku] = useState('');
@@ -51,13 +51,40 @@ export const Products: React.FC = () => {
   const handleConfirmExcelImport = () => {
     if (!excelPreview) return;
     
-    // Merge or Overwrite products
-    const finalProducts = excelImportMode === 'overwrite'
-      ? excelPreview.products
-      : [
-          ...products,
-          ...excelPreview.products.filter(p => !products.find(ep => ep.sku === p.sku))
-        ];
+    let finalProducts: typeof products = [];
+
+    if (excelImportMode === 'overwrite') {
+      finalProducts = excelPreview.products.map(p => {
+        const existing = products.find(ep => ep.sku === p.sku);
+        return {
+          ...p,
+          // Nếu sandbox thì lấy tồn kho từ excel, ngược lại giữ tồn kho cũ
+          nhanhStock: apiMode === 'sandbox' ? p.nhanhStock : (existing?.nhanhStock ?? 0)
+        };
+      });
+    } else {
+      // Append mode
+      finalProducts = products.map(prod => {
+        const match = excelPreview.products.find(p => p.sku === prod.sku);
+        if (match) {
+          return {
+            ...prod,
+            // Nếu sandbox thì cập nhật số lượng tồn kho
+            nhanhStock: apiMode === 'sandbox' ? match.nhanhStock : prod.nhanhStock
+          };
+        }
+        return prod;
+      });
+
+      excelPreview.products.forEach(p => {
+        if (!finalProducts.some(fp => fp.sku === p.sku)) {
+          finalProducts.push({
+            ...p,
+            nhanhStock: apiMode === 'sandbox' ? p.nhanhStock : 0
+          });
+        }
+      });
+    }
 
     // For other entities, keep them intact
     const jsonStr = JSON.stringify({
@@ -72,7 +99,8 @@ export const Products: React.FC = () => {
     const result = importAllData(jsonStr);
     if (result.success) {
       const mode = excelImportMode === 'overwrite' ? 'Ghi đè' : 'Thêm mới';
-      setExcelSuccess(`✅ [${mode}] Import sản phẩm thành công: ${excelPreview.products.length} sản phẩm.`);
+      const qtyMsg = apiMode === 'sandbox' ? ' và số lượng tồn kho' : '';
+      setExcelSuccess(`✅ [${mode}] Import sản phẩm${qtyMsg} thành công: ${excelPreview.products.length} sản phẩm.`);
       setShowExcelConfirm(false);
       setExcelPreview(null);
       setTimeout(() => window.location.reload(), 1500);
