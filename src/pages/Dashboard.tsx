@@ -21,8 +21,11 @@ export const Dashboard: React.FC = () => {
   // 3. Calculate Operating Expenses (Chi phí vận hành)
   const totalOpExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  // 4. Total Cost = COGS + Operating Expenses
-  const totalCost = totalCOGS + totalOpExpenses;
+  // 3b. Calculate total Platform Fee from sales (Chi phí sàn)
+  const totalPlatformFee = sales.reduce((sum, s) => sum + (s.platformFee || 0), 0);
+
+  // 4. Total Cost = COGS + Operating Expenses + Platform Fees
+  const totalCost = totalCOGS + totalOpExpenses + totalPlatformFee;
 
   // 5. Net Profit
   const netProfit = totalRevenue - totalCost;
@@ -42,6 +45,7 @@ export const Dashboard: React.FC = () => {
   // 8. Calculate breakdown by cost category
   const costByCategory = {
     production: totalCOGS,
+    platformFee: totalPlatformFee,
     labor: expenses.filter(e => e.category === 'labor').reduce((sum, e) => sum + e.amount, 0),
     rent: expenses.filter(e => e.category === 'rent').reduce((sum, e) => sum + e.amount, 0),
     ads: expenses.filter(e => e.category === 'ads').reduce((sum, e) => sum + e.amount, 0),
@@ -101,7 +105,7 @@ export const Dashboard: React.FC = () => {
           <div className="kpi-label">Tổng chi phí phát sinh</div>
           <div className="kpi-value mono" style={{ color: '#ba1a1a' }}>{formatCurrency(totalCost)}</div>
           <div className="kpi-desc">
-            <span>Giá vốn SX: {formatCurrency(totalCOGS)} + Chi phí VH: {formatCurrency(totalOpExpenses)}</span>
+            <span>Giá vốn: {formatCurrency(totalCOGS)} + CP sàn: {formatCurrency(totalPlatformFee)} + CP VH: {formatCurrency(totalOpExpenses)}</span>
           </div>
         </div>
 
@@ -172,6 +176,10 @@ export const Dashboard: React.FC = () => {
               <div style={styles.plRow}>
                 <span>• Giá vốn sản xuất (COGS)</span>
                 <span className="mono">{formatCurrency(costByCategory.production)}</span>
+              </div>
+              <div style={styles.plRow}>
+                <span>• Chi phí sàn (Shopee, TikTok...)</span>
+                <span className="mono">{formatCurrency(costByCategory.platformFee)}</span>
               </div>
               <div style={styles.plRow}>
                 <span>• Chi phí nhân công</span>
@@ -305,6 +313,7 @@ export const Dashboard: React.FC = () => {
                       const pct = (val / totalCost) * 100;
                       const colors: Record<string, string> = {
                         production: '#ba1a1a', // COGS (Red)
+                        platformFee: '#ff9800', // Platform fee (Orange)
                         labor: '#1976d2',
                         rent: '#9c27b0',
                         ads: '#e91e63',
@@ -314,6 +323,7 @@ export const Dashboard: React.FC = () => {
                       };
                       const names: Record<string, string> = {
                         production: 'Giá vốn SX',
+                        platformFee: 'CP sàn',
                         labor: 'Nhân công',
                         rent: 'Mặt bằng',
                         ads: 'Quảng cáo',
@@ -344,6 +354,7 @@ export const Dashboard: React.FC = () => {
                       const pct = (val / totalCost) * 100;
                       const colors: Record<string, string> = {
                         production: '#ba1a1a',
+                        platformFee: '#ff9800',
                         labor: '#1976d2',
                         rent: '#9c27b0',
                         ads: '#e91e63',
@@ -353,6 +364,7 @@ export const Dashboard: React.FC = () => {
                       };
                       const names: Record<string, string> = {
                         production: 'Giá vốn',
+                        platformFee: 'CP sàn',
                         labor: 'Công',
                         rent: 'Mặt bằng',
                         ads: 'QC',
