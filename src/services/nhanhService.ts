@@ -402,6 +402,7 @@ export const fetchNhanhOrders = async (fromDate?: string, toDate?: string): Prom
               sku: String(p.productCode || p.code || p.barcode || '').toUpperCase().trim(),
               quantity: parseInt(String(p.quantity || '1')),
               price: parseFloat(String(p.price || '0')),
+              discountedPrice: p.discountedPrice !== undefined ? parseFloat(String(p.discountedPrice)) : (p.discountPrice !== undefined ? parseFloat(String(p.discountPrice)) : parseFloat(String(p.price || '0'))),
             }))
           : [];
 
@@ -451,6 +452,8 @@ export const fetchNhanhOrders = async (fromDate?: string, toDate?: string): Prom
           createdAt: orderDate,
           status: String(item.statusCode || item.status || 'Success'),
           salesChannel: mapNhanhChannel(channelName),
+          totalPrice: item.totalPrice !== undefined ? parseFloat(String(item.totalPrice)) : (item.totalDouble !== undefined ? parseFloat(String(item.totalDouble)) : undefined),
+          platformFee: item.platformFee !== undefined ? parseFloat(String(item.platformFee)) : (item.calcPlatformFee !== undefined ? parseFloat(String(item.calcPlatformFee)) : undefined),
         });
       });
 
