@@ -1,28 +1,105 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../hooks/useApp';
 import { formatCurrency } from '../utils/formatters';
-import { TrendingUp, PackageCheck } from 'lucide-react';
+import { TrendingUp, PackageCheck, CalendarDays } from 'lucide-react';
+
+/** Helper: get ISO date string N days ago */
+const daysAgo = (n: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+};
+const todayISO = () => new Date().toISOString().split('T')[0];
+
+type QuickRange = 'today' | '7d' | '30d' | 'all' | 'custom';
 
 export const Dashboard: React.FC = () => {
   const { products, productionBatches, sales, expenses } = useApp();
 
+  // --- Date range filter state ---
+  const [quickRange, setQuickRange] = useState<QuickRange>('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  /** Computed effective date range */
+  const effectiveRange = useMemo(() => {
+    switch (quickRange) {
+      case 'today': return { from: todayISO(), to: todayISO() };
+      case '7d':    return { from: daysAgo(6), to: todayISO() };
+      case '30d':   return { from: daysAgo(29), to: todayISO() };
+      case 'custom': return { from: fromDate, to: toDate };
+      case 'all':
+      default:      return { from: '', to: '' };
+    }
+  }, [quickRange, fromDate, toDate]);
+
+  const handleQuickRange = (range: QuickRange) => {
+    setQuickRange(range);
+    if (range !== 'custom') {
+      setFromDate('');
+      setToDate('');
+    }
+  };
+
+  const handleCustomFrom = (val: string) => { setFromDate(val); setQuickRange('custom'); };
+  const handleCustomTo = (val: string) => { setToDate(val); setQuickRange('custom'); };
+
+  /** Filter sales & expenses by effective date range */
+  const filteredSales = useMemo(() => {
+    const { from, to } = effectiveRange;
+    if (!from && !to) return sales;
+    return sales.filter(s => {
+      const d = s.saleDate;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  }, [sales, effectiveRange]);
+
+  const filteredExpenses = useMemo(() => {
+    const { from, to } = effectiveRange;
+    if (!from && !to) return expenses;
+    return expenses.filter(e => {
+      const d = e.expenseDate;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
+  }, [expenses, effectiveRange]);
+
+  /** Label for the active range shown under the filter */
+  const rangeSummary = useMemo(() => {
+    switch (quickRange) {
+      case 'today': return `Hôm nay (${todayISO()})`;
+      case '7d':    return `7 ngày gần nhất (${daysAgo(6)} → ${todayISO()})`;
+      case '30d':   return `30 ngày gần nhất (${daysAgo(29)} → ${todayISO()})`;
+      case 'custom': {
+        const f = fromDate || '...';
+        const t = toDate || '...';
+        return `Tùy chọn: ${f} → ${t}`;
+      }
+      case 'all':
+      default: return 'Toàn bộ thời gian';
+    }
+  }, [quickRange, fromDate, toDate]);
 
 
-  // 1. Calculate Revenue
-  const totalRevenue = sales.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
+
+  // 1. Calculate Revenue (filtered)
+  const totalRevenue = filteredSales.reduce((sum, s) => sum + s.quantity * s.unitPrice, 0);
 
   // 2. Calculate COGS (Cost of Goods Sold - Giá vốn hàng bán)
-  const totalCOGS = sales.reduce((sum, s) => {
+  const totalCOGS = filteredSales.reduce((sum, s) => {
     const prod = products.find((p) => p.sku === s.productSku);
     const costPerUnit = prod ? prod.defaultCost : 0;
     return sum + s.quantity * costPerUnit;
   }, 0);
 
-  // 3. Calculate Operating Expenses (Chi phí vận hành)
-  const totalOpExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  // 3. Calculate Operating Expenses (Chi phí vận hành) (filtered)
+  const totalOpExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   // 3b. Calculate total Platform Fee from sales (Chi phí sàn)
-  const totalPlatformFee = sales.reduce((sum, s) => sum + (s.platformFee || 0), 0);
+  const totalPlatformFee = filteredSales.reduce((sum, s) => sum + (s.platformFee || 0), 0);
 
   // 4. Total Cost = COGS + Operating Expenses + Platform Fees
   const totalCost = totalCOGS + totalOpExpenses + totalPlatformFee;
@@ -33,25 +110,25 @@ export const Dashboard: React.FC = () => {
   // 6. Margin
   const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
-  // 7. Calculate breakdown by revenue source
+  // 7. Calculate breakdown by revenue source (filtered)
   const revenueBySource = {
-    shopee: sales.filter(s => s.source === 'shopee').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
-    tiktok: sales.filter(s => s.source === 'tiktok').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
-    offline: sales.filter(s => s.source === 'offline').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
-    manual: sales.filter(s => s.source === 'manual').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
-    nhanh_vn: sales.filter(s => s.source === 'nhanh_vn').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    shopee: filteredSales.filter(s => s.source === 'shopee').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    tiktok: filteredSales.filter(s => s.source === 'tiktok').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    offline: filteredSales.filter(s => s.source === 'offline').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    manual: filteredSales.filter(s => s.source === 'manual').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
+    nhanh_vn: filteredSales.filter(s => s.source === 'nhanh_vn').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
   };
 
-  // 8. Calculate breakdown by cost category
+  // 8. Calculate breakdown by cost category (filtered)
   const costByCategory = {
     production: totalCOGS,
     platformFee: totalPlatformFee,
-    labor: expenses.filter(e => e.category === 'labor').reduce((sum, e) => sum + e.amount, 0),
-    rent: expenses.filter(e => e.category === 'rent').reduce((sum, e) => sum + e.amount, 0),
-    ads: expenses.filter(e => e.category === 'ads').reduce((sum, e) => sum + e.amount, 0),
-    shipping: expenses.filter(e => e.category === 'shipping').reduce((sum, e) => sum + e.amount, 0),
-    material: expenses.filter(e => e.category === 'material').reduce((sum, e) => sum + e.amount, 0),
-    other: expenses.filter(e => e.category === 'other').reduce((sum, e) => sum + e.amount, 0),
+    labor: filteredExpenses.filter(e => e.category === 'labor').reduce((sum, e) => sum + e.amount, 0),
+    rent: filteredExpenses.filter(e => e.category === 'rent').reduce((sum, e) => sum + e.amount, 0),
+    ads: filteredExpenses.filter(e => e.category === 'ads').reduce((sum, e) => sum + e.amount, 0),
+    shipping: filteredExpenses.filter(e => e.category === 'shipping').reduce((sum, e) => sum + e.amount, 0),
+    material: filteredExpenses.filter(e => e.category === 'material').reduce((sum, e) => sum + e.amount, 0),
+    other: filteredExpenses.filter(e => e.category === 'other').reduce((sum, e) => sum + e.amount, 0),
   };
 
   // 8. Production stages distribution
@@ -65,7 +142,7 @@ export const Dashboard: React.FC = () => {
 
   const activeBatches = productionBatches.filter((b) => b.status === 'running');
   const recentActivities = [
-    ...sales.map((s) => ({
+    ...filteredSales.map((s) => ({
       type: 'sale',
       title: `Bán ${s.quantity} x ${products.find(p => p.sku === s.productSku)?.name || s.productSku}`,
       value: `+${formatCurrency(s.quantity * s.unitPrice)}`,
@@ -90,6 +167,55 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="page-container fade-in">
+      {/* === Date Range Filter Bar === */}
+      <div style={styles.dateFilterBar}>
+        <div style={styles.dateFilterLeft}>
+          <CalendarDays size={16} style={{ color: '#45474c', flexShrink: 0 }} />
+          <div style={styles.quickBtns}>
+            {[
+              { key: 'today' as QuickRange, label: 'Hôm nay' },
+              { key: '7d' as QuickRange, label: '7 ngày' },
+              { key: '30d' as QuickRange, label: '30 ngày' },
+              { key: 'all' as QuickRange, label: 'Tất cả' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => handleQuickRange(key)}
+                style={{
+                  ...styles.quickBtn,
+                  ...(quickRange === key ? styles.quickBtnActive : {}),
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div style={styles.dateInputs}>
+            <input
+              type="date"
+              value={quickRange === 'custom' ? fromDate : effectiveRange.from}
+              onChange={e => handleCustomFrom(e.target.value)}
+              style={styles.dateInput}
+              title="Từ ngày"
+            />
+            <span style={{ color: '#8191a9', fontSize: '12px' }}>→</span>
+            <input
+              type="date"
+              value={quickRange === 'custom' ? toDate : effectiveRange.to}
+              onChange={e => handleCustomTo(e.target.value)}
+              style={styles.dateInput}
+              title="Đến ngày"
+            />
+          </div>
+        </div>
+        <div style={styles.dateFilterSummary}>
+          <span>{rangeSummary}</span>
+          <span style={{ marginLeft: '8px', fontWeight: 600 }}>
+            {filteredSales.length} đơn · {filteredExpenses.length} chi phí
+          </span>
+        </div>
+      </div>
+
       {/* KPI Cards Grid */}
       <div className="kpi-grid">
         <div className="kpi-card">
@@ -477,6 +603,62 @@ export const Dashboard: React.FC = () => {
 };
 
 const styles = {
+  dateFilterBar: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+    padding: '12px 16px',
+    backgroundColor: '#f8fafc',
+    border: '1px solid #e2e5e9',
+    borderRadius: '10px',
+    marginBottom: '20px',
+  },
+  dateFilterLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap' as const,
+  },
+  quickBtns: {
+    display: 'flex',
+    gap: '4px',
+  },
+  quickBtn: {
+    padding: '5px 14px',
+    fontSize: '12px',
+    fontWeight: 600,
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    backgroundColor: '#fff',
+    color: '#45474c',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  } as React.CSSProperties,
+  quickBtnActive: {
+    backgroundColor: '#091426',
+    color: '#fff',
+    borderColor: '#091426',
+  } as React.CSSProperties,
+  dateInputs: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  dateInput: {
+    padding: '5px 10px',
+    fontSize: '12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    backgroundColor: '#fff',
+    color: '#091426',
+    fontFamily: 'inherit',
+    outline: 'none',
+  } as React.CSSProperties,
+  dateFilterSummary: {
+    fontSize: '11px',
+    color: '#8191a9',
+    paddingLeft: '28px',
+  },
   dashboardGrid: {
     display: 'flex',
     flexWrap: 'wrap' as const,
