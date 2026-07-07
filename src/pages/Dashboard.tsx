@@ -86,14 +86,6 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="page-container fade-in">
-      {/* Top Title Section */}
-      <div style={styles.pageHeader}>
-        <div>
-          <h2 style={{ color: '#091426', fontSize: '24px', fontWeight: 700 }}>Bảng điều khiển tài chính & sản xuất</h2>
-          <p style={{ color: '#8191a9', fontSize: '13px' }}>Tổng quan báo cáo lãi lỗ kinh doanh và dòng chảy sản xuất dệt may</p>
-        </div>
-      </div>
-
       {/* KPI Cards Grid */}
       <div className="kpi-grid">
         <div className="kpi-card">
@@ -473,12 +465,6 @@ export const Dashboard: React.FC = () => {
 };
 
 const styles = {
-  pageHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '8px',
-  },
   dashboardGrid: {
     display: 'flex',
     flexWrap: 'wrap' as const,

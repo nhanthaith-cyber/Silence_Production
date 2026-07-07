@@ -61,13 +61,17 @@ export const exportToExcel = (
     SKU: s.productSku,
     'So luong': s.quantity,
     'Don gia (VND)': s.unitPrice,
+    'Gia sau CK (VND)': s.discountedPrice ?? s.unitPrice,
+    'Tong don (VND)': s.totalOrderValue ?? (s.quantity * (s.discountedPrice ?? s.unitPrice)),
+    'CP san (VND)': s.platformFee ?? 0,
+    'Trang thai': s.orderStatus ?? 'success',
     'Ngay ban': s.saleDate,
     'Nguon': s.source,
   }));
   const wsSales = XLSX.utils.json_to_sheet(saleRows.length ? saleRows : [
-    { ID: '', SKU: '', 'So luong': 0, 'Don gia (VND)': 0, 'Ngay ban': TODAY(), 'Nguon': 'manual' }
+    { ID: '', SKU: '', 'So luong': 0, 'Don gia (VND)': 0, 'Gia sau CK (VND)': 0, 'Tong don (VND)': 0, 'CP san (VND)': 0, 'Trang thai': 'success', 'Ngay ban': TODAY(), 'Nguon': 'manual' }
   ]);
-  wsSales['!cols'] = [{ wch: 18 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
+  wsSales['!cols'] = [{ wch: 18 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, wsSales, 'Sales');
 
   // ── Sheet 3: Expenses ──
@@ -130,9 +134,9 @@ export const generateExcelTemplate = (): void => {
   XLSX.utils.book_append_sheet(wb, wsP, 'Products');
 
   const wsS = XLSX.utils.json_to_sheet([
-    { ID: '', SKU: 'VD-001', 'So luong': 5, 'Don gia (VND)': 120000, 'Ngay ban': TODAY(), 'Nguon': 'manual' },
+    { ID: 'SALE-001', SKU: 'VD-001', 'So luong': 5, 'Don gia (VND)': 120000, 'Gia sau CK (VND)': 110000, 'Tong don (VND)': 550000, 'CP san (VND)': 25000, 'Trang thai': 'success', 'Ngay ban': TODAY(), 'Nguon': 'manual' },
   ]);
-  wsS['!cols'] = [{ wch: 18 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 12 }, { wch: 12 }];
+  wsS['!cols'] = [{ wch: 18 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, wsS, 'Sales');
 
   const wsE = XLSX.utils.json_to_sheet([
@@ -239,12 +243,42 @@ export const importFromExcel = (file: File): Promise<ExcelImportResult> => {
             if (!VALID_SOURCES.includes(source)) {
               warnings.push(`Sales dong ${idx + 2} (${sku}): Nguon "${source}" khong hop le, dat thanh "manual".`);
             }
-            const existingId = toStr(row['ID']);
+            
+            const existingId = toStr(row['ID'] ?? row['id']);
+            
+            // Parse additional order fields
+            const platformFeeRaw = row['CP san (VND)'] ?? row['CP sàn (VND)'] ?? row['CP san'] ?? row['CP sàn'] ?? row['platformFee'] ?? row['Phí sàn'];
+            const platformFee = platformFeeRaw !== undefined ? toNum(platformFeeRaw) : 0;
+            
+            const discountedPriceRaw = row['Gia sau CK (VND)'] ?? row['Giá sau CK (VND)'] ?? row['Gia sau CK'] ?? row['Giá sau CK'] ?? row['discountedPrice'];
+            const discountedPrice = discountedPriceRaw !== undefined ? toNum(discountedPriceRaw) : price;
+
+            const totalOrderValueRaw = row['Tong don (VND)'] ?? row['Tổng đơn (VND)'] ?? row['Tong don'] ?? row['Tổng đơn'] ?? row['totalOrderValue'];
+            const totalOrderValue = totalOrderValueRaw !== undefined ? toNum(totalOrderValueRaw) : (qty * discountedPrice);
+
+            const orderStatus = toStr(row['Trang thai'] ?? row['Trạng thái'] ?? row['orderStatus'] ?? 'success');
+            
+            const orderIdRaw = row['orderId'] ?? row['Mã đơn hàng'] ?? row['Ma don hang'];
+            let orderId = orderIdRaw !== undefined ? toStr(orderIdRaw) : undefined;
+            if (!orderId && existingId) {
+              const dashParts = existingId.split('-');
+              if (dashParts.length > 1 && /^[1-9]\d*$/.test(dashParts[dashParts.length - 1])) {
+                orderId = dashParts.slice(0, -1).join('-');
+              } else {
+                orderId = existingId;
+              }
+            }
+
             sales.push({
               id: existingId || `SALE-XLS-${Date.now()}-${idx}`,
+              orderId,
               productSku: sku,
               quantity: qty,
               unitPrice: price,
+              discountedPrice,
+              totalOrderValue,
+              platformFee,
+              orderStatus,
               saleDate,
               source: (VALID_SOURCES.includes(source) ? source : 'manual') as Sale['source'],
             });
