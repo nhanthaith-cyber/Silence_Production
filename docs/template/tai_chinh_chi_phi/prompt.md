@@ -63,3 +63,17 @@ Chia làm hai cột chính (Cột trái ~40% chiều rộng, Cột phải ~60% c
      - **Số tiền chi:** Số tiền thực chi (in đậm màu đỏ `#ba1a1a`, font Monospace).
      - **Ghi chú:** Nội dung ghi chú chi tiết.
      - *Trạng thái trống:* Hiển thị "Chưa ghi nhận chi phí. Nhập chi phí ở form bên trái." căn giữa.
+
+---
+
+## 3. Liên kết với Dashboard — Góc nhìn Tiền thu thực tế
+
+Chi phí vận hành nhập tại trang này được sử dụng trong **Dashboard → Tab "Theo Tiền thu thực tế"** để tính lãi/lỗ theo dòng tiền thực:
+
+```
+Lãi/Lỗ thực tế = Σ(Tiền thu thực tế nhập tay trên Dashboard) − Σ(Chi phí vận hành nhập tại trang này)
+```
+
+- **Chi phí** bao gồm tất cả 6 loại: Nhân công, Mặt bằng, Quảng cáo, Vận chuyển, Nguyên vật liệu, Khác.
+- **Không tính** COGS (giá vốn sản xuất tự động) và phí sàn (platformFee) — vì chi phí nguyên vật liệu và nhân công đã được ghi nhận trực tiếp tại đây.
+- Tiền thu thực tế được nhập riêng trên Dashboard (tab 💰 "Theo Tiền thu thực tế") với chi tiết ngày, nguồn thu (Shopee, TikTok, Offline, Chuyển khoản, Tiền mặt, Khác).

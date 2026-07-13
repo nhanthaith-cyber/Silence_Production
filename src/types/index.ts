@@ -64,6 +64,22 @@ export interface Expense {
   notes: string;
 }
 
+/** Nguồn tiền thu thực tế từ các sàn/kênh bán */
+export type ActualRevenueSource = 'shopee' | 'tiktok' | 'offline' | 'bank_transfer' | 'cash' | 'other';
+
+/** Bản ghi tiền thu thực tế từ sàn/kênh bán — dùng cho góc nhìn dòng tiền (cashflow) */
+export interface ActualRevenue {
+  id: string;
+  /** Số tiền thu thực tế (VND) */
+  amount: number;
+  /** Nguồn thu (từ sàn nào) */
+  source: ActualRevenueSource;
+  /** Ngày nhận tiền */
+  receivedDate: string;
+  /** Ghi chú chi tiết */
+  notes: string;
+}
+
 /** Chế độ API: sandbox (mock) hoặc live (kết nối thực) */
 export type NhanhApiMode = 'sandbox' | 'live';
 
@@ -85,6 +101,7 @@ export interface AppContextType {
   productionBatches: ProductionBatch[];
   sales: Sale[];
   expenses: Expense[];
+  actualRevenues: ActualRevenue[];
 
   // CRUD Actions
   addProduct: (product: Product) => { success: boolean; error?: string };
@@ -101,6 +118,10 @@ export interface AppContextType {
   deleteProductionBatch: (batchId: string) => void;
   addSale: (sale: Omit<Sale, 'id' | 'saleDate'>) => void;
   addExpense: (expense: Omit<Expense, 'id' | 'expenseDate'>) => void;
+
+  // Actual Revenue (Tiền thu thực tế)
+  addActualRevenue: (data: Omit<ActualRevenue, 'id'>) => void;
+  deleteActualRevenue: (id: string) => void;
 
   // Sync Nhanh.vn
   syncSalesFromNhanh: (fromDate?: string, toDate?: string) => Promise<number>;

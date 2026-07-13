@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import type {
   Product, ProductionBatch, ProductionBatchItem, ProductionStage, Sale, Expense,
+  ActualRevenue,
   AppContextType, NhanhApiMode, ConnectionStatus, SyncLog, UserWithPassword,
   User, ActionLog, ActionLogCategory
 } from '../types';
@@ -67,6 +68,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [productionBatches, setProductionBatches] = useState<ProductionBatch[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [actualRevenues, setActualRevenues] = useState<ActualRevenue[]>([]);
   const [users, setUsers] = useState<UserWithPassword[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [actionLogs, setActionLogs] = useState<ActionLog[]>([]);
@@ -79,6 +81,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load from LocalStorage or seed defaults
   useEffect(() => {
+    // Hỗ trợ reset dữ liệu qua URL param: ?resetData=true
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('resetData') === 'true') {
+      console.log('🔄 resetData=true detected → clearing localStorage...');
+      localStorage.removeItem('silence_prod_products');
+      localStorage.removeItem('silence_prod_batches');
+      localStorage.removeItem('silence_prod_sales');
+      localStorage.removeItem('silence_prod_expenses');
+      localStorage.removeItem('silence_actual_revenues');
+      localStorage.removeItem('silence_sync_logs');
+      localStorage.removeItem('silence_last_sync');
+      // Remove the query param from URL without reload
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     try {
       const localUser = localStorage.getItem('silence_user');
       if (localUser) setUser(JSON.parse(localUser));
@@ -133,6 +151,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('silence_prod_expenses', JSON.stringify(defaultExpenses));
       }
 
+      const localActualRevenues = localStorage.getItem('silence_actual_revenues');
+      if (localActualRevenues) setActualRevenues(JSON.parse(localActualRevenues));
+
       if (localSyncLogs) setSyncLogs(JSON.parse(localSyncLogs));
       if (localLastSync) setLastSyncTime(localLastSync);
       if (localApiMode === 'live' || localApiMode === 'sandbox') setApiModeState(localApiMode as NhanhApiMode);
@@ -142,6 +163,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setProductionBatches(defaultBatches);
       setSales(defaultSales);
       setExpenses(defaultExpenses);
+      setActualRevenues([]);
       localStorage.setItem('silence_prod_products', JSON.stringify(defaultProducts));
       localStorage.setItem('silence_prod_batches', JSON.stringify(defaultBatches));
       localStorage.setItem('silence_prod_sales', JSON.stringify(defaultSales));
@@ -391,6 +413,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ============================
+  // Actual Revenue (Tiền thu thực tế)
+  // ============================
+
+  const addActualRevenue = (data: Omit<ActualRevenue, 'id'>) => {
+    const newRevenue: ActualRevenue = {
+      id: generateId('AREV', 5),
+      ...data,
+    };
+    const updated = [newRevenue, ...actualRevenues];
+    setActualRevenues(updated);
+    saveToLocal('silence_actual_revenues', updated);
+
+    const sourceNames: Record<string, string> = {
+      shopee: 'Shopee', tiktok: 'TikTok', offline: 'Offline',
+      bank_transfer: 'Chuyển khoản', cash: 'Tiền mặt', other: 'Khác',
+    };
+    createAndSaveActionLog(
+      'Ghi nhận tiền thu',
+      `Đã ghi nhận tiền thu thực tế ${newRevenue.id}: ${data.amount.toLocaleString()}đ từ ${sourceNames[data.source] || data.source} ngày ${data.receivedDate}.`,
+      'sale'
+    );
+  };
+
+  const deleteActualRevenue = (id: string) => {
+    const updated = actualRevenues.filter((r) => r.id !== id);
+    setActualRevenues(updated);
+    saveToLocal('silence_actual_revenues', updated);
+    createAndSaveActionLog('Xóa tiền thu', `Đã xóa bản ghi tiền thu thực tế: ${id}.`, 'sale');
+  };
+
+  // ============================
   // Sync Nhanh.vn
   // ============================
 
@@ -574,7 +627,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ============================
 
   const exportAllDataFn = (): string => {
-    return exportData(products, productionBatches, sales, expenses);
+    return exportData(products, productionBatches, sales, expenses, actualRevenues);
   };
 
   const importAllData = (json: string): { success: boolean; error?: string } => {
@@ -589,15 +642,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProductionBatches(migratedBatches);
     setSales(data.sales);
     setExpenses(data.expenses);
+    setActualRevenues(data.actualRevenues || []);
 
     saveToLocal('silence_prod_products', data.products);
     saveToLocal('silence_prod_batches', migratedBatches);
     saveToLocal('silence_prod_sales', data.sales);
     saveToLocal('silence_prod_expenses', data.expenses);
+    saveToLocal('silence_actual_revenues', data.actualRevenues || []);
 
+    const arCount = (data.actualRevenues || []).length;
     addSyncLog('Hệ thống', 'Import dữ liệu', 'success',
-      `Đã import: ${data.products.length} sản phẩm, ${data.productionBatches.length} lô SX, ${data.sales.length} đơn hàng, ${data.expenses.length} chi phí.`);
-    createAndSaveActionLog('Import Backup JSON', `Đã khôi phục dữ liệu: ${data.products.length} SP, ${data.productionBatches.length} Lô SX, ${data.sales.length} Đơn, ${data.expenses.length} Chi phí.`, 'system');
+      `Đã import: ${data.products.length} sản phẩm, ${data.productionBatches.length} lô SX, ${data.sales.length} đơn hàng, ${data.expenses.length} chi phí, ${arCount} khoản thu.`);
+    createAndSaveActionLog('Import Backup JSON', `Đã khôi phục dữ liệu: ${data.products.length} SP, ${data.productionBatches.length} Lô SX, ${data.sales.length} Đơn, ${data.expenses.length} Chi phí, ${arCount} Thu.`, 'system');
 
     return { success: true };
   };
@@ -609,10 +665,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('silence_prod_expenses');
     localStorage.removeItem('silence_prod_users');
     localStorage.removeItem('silence_action_logs');
+    localStorage.removeItem('silence_actual_revenues');
     setProducts(defaultProducts);
     setProductionBatches(defaultBatches);
     setSales(defaultSales);
     setExpenses(defaultExpenses);
+    setActualRevenues([]);
     setUsers(defaultUsers);
     setActionLogs([]);
 
@@ -709,6 +767,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         productionBatches,
         sales,
         expenses,
+        actualRevenues,
         addProduct,
         bulkAddProducts,
         deleteProduct,
@@ -717,6 +776,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteProductionBatch,
         addSale,
         addExpense,
+        addActualRevenue,
+        deleteActualRevenue,
         syncSalesFromNhanh,
         syncStockFromNhanh,
         syncStockToNhanh,

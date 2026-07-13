@@ -7,7 +7,7 @@
  * - Báo cáo sản xuất
  */
 
-import type { Product, ProductionBatch, Sale, Expense } from '../types';
+import type { Product, ProductionBatch, Sale, Expense, ActualRevenue } from '../types';
 
 // ============================
 // KPI & Metrics
@@ -60,6 +60,7 @@ export interface ExportData {
   productionBatches: ProductionBatch[];
   sales: Sale[];
   expenses: Expense[];
+  actualRevenues?: ActualRevenue[];
 }
 
 /**
@@ -69,15 +70,17 @@ export const exportAllData = (
   products: Product[],
   batches: ProductionBatch[],
   sales: Sale[],
-  expenses: Expense[]
+  expenses: Expense[],
+  actualRevenues: ActualRevenue[] = []
 ): string => {
   const exportData: ExportData = {
-    version: '1.0',
+    version: '1.1',
     exportedAt: new Date().toISOString(),
     products,
     productionBatches: batches,
     sales,
     expenses,
+    actualRevenues,
   };
   return JSON.stringify(exportData, null, 2);
 };
