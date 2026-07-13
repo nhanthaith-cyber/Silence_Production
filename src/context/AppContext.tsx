@@ -642,15 +642,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProductionBatches(migratedBatches);
     setSales(data.sales);
     setExpenses(data.expenses);
-    setActualRevenues(data.actualRevenues || []);
+
+    // Bảo toàn tiền thu thực tế nhập tay khi import Excel hoặc file backup cũ không có trường này
+    let arCount = actualRevenues.length;
+    if (data.actualRevenues !== undefined) {
+      setActualRevenues(data.actualRevenues);
+      saveToLocal('silence_actual_revenues', data.actualRevenues);
+      arCount = data.actualRevenues.length;
+    }
 
     saveToLocal('silence_prod_products', data.products);
     saveToLocal('silence_prod_batches', migratedBatches);
     saveToLocal('silence_prod_sales', data.sales);
     saveToLocal('silence_prod_expenses', data.expenses);
-    saveToLocal('silence_actual_revenues', data.actualRevenues || []);
 
-    const arCount = (data.actualRevenues || []).length;
     addSyncLog('Hệ thống', 'Import dữ liệu', 'success',
       `Đã import: ${data.products.length} sản phẩm, ${data.productionBatches.length} lô SX, ${data.sales.length} đơn hàng, ${data.expenses.length} chi phí, ${arCount} khoản thu.`);
     createAndSaveActionLog('Import Backup JSON', `Đã khôi phục dữ liệu: ${data.products.length} SP, ${data.productionBatches.length} Lô SX, ${data.sales.length} Đơn, ${data.expenses.length} Chi phí, ${arCount} Thu.`, 'system');
