@@ -114,3 +114,23 @@ Khi co ket noi Nhanh.vn tro lai, chi can goi lai cac ham sync ma khong xung dot 
 | `Expense` | Chi phi: id, category, amount, expenseDate, notes |
 | `ExcelImportResult` | [MOI] Ket qua parse Excel: products[], sales[], expenses[], batches[], warnings[] |
 | `ExcelImportMode` | [MOI] Che do import: overwrite hoac append |
+
+---
+
+## Quy trinh tu dong trien khai (CI/CD Deployment Flow)
+
+He thong tu dong build va deploy len GitHub Pages sau moi lan co thay doi duoc day (push) len nhanh chinh:
+
+```mermaid
+graph LR
+    Push[Push/Merge to 'main'] --> Action[GitHub Actions Runner]
+    Action --> Install[Install node_modules & Dependencies]
+    Action --> Build[Run 'npm run build' to generate /dist]
+    Action --> Upload[Upload dist artifact to GitHub Pages]
+    Action --> Deploy[Deploy live application]
+```
+
+- **Workflow File:** `.github/workflows/deploy.yml`
+- **Triggers:** Bat ky push/merge nao toi nhanh `main` deu tu dong kich hoat luong chay.
+- **Hosting:** GitHub Pages.
+
