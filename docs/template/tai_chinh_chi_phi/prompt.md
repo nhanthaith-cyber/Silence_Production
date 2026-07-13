@@ -59,7 +59,7 @@ Chia làm hai cột chính (Cột trái ~40% chiều rộng, Cột phải ~60% c
    - **Bảng danh sách chi phí (Table):** Gồm các cột:
      - **Ngày:** Ngày phát sinh khoản chi (font Monospace).
      - **Mã khoản:** ID giao dịch (font Monospace).
-     - **Loại chi phí:** Badge phân loại (Nhân công, Mặt bằng, Quảng cáo, Vận chuyển, Vật liệu, Khác).
+     - **Loại chi phí:** Badge phân loại (Nhân công, Mặt bằng, Quảng cáo, Vận chuyển, Nguyên phụ liệu, Gia công, Khác).
      - **Số tiền chi:** Số tiền thực chi (in đậm màu đỏ `#ba1a1a`, font Monospace).
      - **Ghi chú:** Nội dung ghi chú chi tiết.
      - *Trạng thái trống:* Hiển thị "Chưa ghi nhận chi phí. Nhập chi phí ở form bên trái." căn giữa.
@@ -74,6 +74,8 @@ Chi phí vận hành nhập tại trang này được sử dụng trong **Dashbo
 Lãi/Lỗ thực tế = Σ(Tiền thu thực tế nhập tay trên Dashboard) − Σ(Chi phí vận hành nhập tại trang này)
 ```
 
-- **Chi phí** bao gồm tất cả 6 loại: Nhân công, Mặt bằng, Quảng cáo, Vận chuyển, Nguyên vật liệu, Khác.
-- **Không tính** COGS (giá vốn sản xuất tự động) và phí sàn (platformFee) — vì chi phí nguyên vật liệu và nhân công đã được ghi nhận trực tiếp tại đây.
+- **Chi phí** bao gồm các loại: Nhân công, Mặt bằng, Quảng cáo, Vận chuyển, Nguyên phụ liệu, Gia công, Khác.
+- **Quy tắc phân bổ giữa các tab lãi lỗ trên Dashboard**:
+  - **Tab "Theo Doanh thu"**: Các khoản chi nhập tay có loại là **Gia công** và **Nguyên phụ liệu** sẽ **không được cộng dồn** vào tổng chi phí của tab này (để tránh tính trùng vì Giá vốn COGS của sản phẩm đã chứa các chi phí này). Chúng sẽ hiển thị dưới dạng ghi chú "(Đã gộp trong COGS)".
+  - **Tab "Theo Tiền thu thực tế"**: Tính toán đầy đủ tất cả các khoản chi thực tế đã phát sinh (bao gồm cả Gia công và Nguyên phụ liệu).
 - Tiền thu thực tế được nhập riêng trên Dashboard (tab 💰 "Theo Tiền thu thực tế") với chi tiết ngày, nguồn thu (Shopee, TikTok, Offline, Chuyển khoản, Tiền mặt, Khác).

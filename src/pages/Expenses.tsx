@@ -162,7 +162,8 @@ export const Expenses: React.FC = () => {
     rent: 'Mặt bằng',
     ads: 'Quảng cáo/Marketing',
     shipping: 'Vận chuyển',
-    material: 'Nguyên vật liệu',
+    material: 'Nguyên phụ liệu',
+    processing: 'Gia công',
     other: 'Khác',
   };
 
@@ -214,7 +215,8 @@ export const Expenses: React.FC = () => {
                   <option value="rent">Mặt bằng / Thuê xưởng</option>
                   <option value="ads">Quảng cáo / Marketing</option>
                   <option value="shipping">Vận chuyển / Logistics</option>
-                  <option value="material">Nguyên vật liệu (Vải, phụ kiện...)</option>
+                  <option value="material">Nguyên phụ liệu (Chỉ tính dòng tiền thực)</option>
+                  <option value="processing">Gia công (Chỉ tính dòng tiền thực)</option>
                   <option value="other">Chi phí khác</option>
                 </select>
               </div>

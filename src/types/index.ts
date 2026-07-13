@@ -54,7 +54,7 @@ export interface Sale {
 /** Nguồn đơn hàng: tất cả lấy từ Nhanh.vn, phân loại theo kênh bán */
 export type SaleSource = 'shopee' | 'tiktok' | 'offline' | 'manual' | 'nhanh_vn';
 
-export type ExpenseCategory = 'labor' | 'rent' | 'ads' | 'shipping' | 'material' | 'other';
+export type ExpenseCategory = 'labor' | 'rent' | 'ads' | 'shipping' | 'material' | 'processing' | 'other';
 
 export interface Expense {
   id: string;

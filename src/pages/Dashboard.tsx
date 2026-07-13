@@ -122,7 +122,13 @@ export const Dashboard: React.FC = () => {
     const costPerUnit = prod ? prod.defaultCost : 0;
     return sum + s.quantity * costPerUnit;
   }, 0);
-  const totalOpExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  
+  // Tab Doanh thu: Không cộng phí Gia công (processing) và Nguyên phụ liệu (material) vào OPEX
+  // vì COGS (giá vốn sản xuất) đã bao gồm 2 khoản này.
+  const totalOpExpenses = filteredExpenses
+    .filter(e => e.category !== 'processing' && e.category !== 'material')
+    .reduce((sum, e) => sum + e.amount, 0);
+    
   const totalPlatformFee = filteredSales.reduce((sum, s) => sum + (s.platformFee || 0), 0);
   const totalCost = totalCOGS + totalOpExpenses + totalPlatformFee;
   const netProfit = totalRevenue - totalCost;
@@ -136,6 +142,12 @@ export const Dashboard: React.FC = () => {
     nhanh_vn: filteredSales.filter(s => s.source === 'nhanh_vn').reduce((sum, s) => sum + s.quantity * s.unitPrice, 0),
   };
 
+  // Chi phí thực tế đã chi ra (dùng để hiển thị trong P&L doanh thu để đối chiếu nhưng không cộng vào tổng)
+  const actualOpExpensesInCurPeriod = {
+    material: filteredExpenses.filter(e => e.category === 'material').reduce((sum, e) => sum + e.amount, 0),
+    processing: filteredExpenses.filter(e => e.category === 'processing').reduce((sum, e) => sum + e.amount, 0),
+  };
+
   const costByCategory = {
     production: totalCOGS,
     platformFee: totalPlatformFee,
@@ -143,7 +155,8 @@ export const Dashboard: React.FC = () => {
     rent: filteredExpenses.filter(e => e.category === 'rent').reduce((sum, e) => sum + e.amount, 0),
     ads: filteredExpenses.filter(e => e.category === 'ads').reduce((sum, e) => sum + e.amount, 0),
     shipping: filteredExpenses.filter(e => e.category === 'shipping').reduce((sum, e) => sum + e.amount, 0),
-    material: filteredExpenses.filter(e => e.category === 'material').reduce((sum, e) => sum + e.amount, 0),
+    material: 0, // Đặt bằng 0 trong tab Doanh thu vì đã gộp trong COGS
+    processing: 0, // Đặt bằng 0 trong tab Doanh thu vì đã gộp trong COGS
     other: filteredExpenses.filter(e => e.category === 'other').reduce((sum, e) => sum + e.amount, 0),
   };
 
@@ -151,7 +164,10 @@ export const Dashboard: React.FC = () => {
   // Actual Revenue (Cashflow) calculations
   // ============================
   const totalActualRevenue = filteredActualRevenues.reduce((sum, r) => sum + r.amount, 0);
-  const actualNetProfit = totalActualRevenue - totalOpExpenses;
+  
+  // Tab Tiền thu thực tế: Tính tất cả chi phí bao gồm cả Gia công và Nguyên vật liệu chi ra thực tế
+  const totalOpExpensesActual = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const actualNetProfit = totalActualRevenue - totalOpExpensesActual;
   const actualProfitMargin = totalActualRevenue > 0 ? (actualNetProfit / totalActualRevenue) * 100 : 0;
 
   const actualRevenueBySource: Record<string, number> = {
@@ -169,6 +185,7 @@ export const Dashboard: React.FC = () => {
     ads: filteredExpenses.filter(e => e.category === 'ads').reduce((sum, e) => sum + e.amount, 0),
     shipping: filteredExpenses.filter(e => e.category === 'shipping').reduce((sum, e) => sum + e.amount, 0),
     material: filteredExpenses.filter(e => e.category === 'material').reduce((sum, e) => sum + e.amount, 0),
+    processing: filteredExpenses.filter(e => e.category === 'processing').reduce((sum, e) => sum + e.amount, 0),
     other: filteredExpenses.filter(e => e.category === 'other').reduce((sum, e) => sum + e.amount, 0),
   };
 
@@ -427,8 +444,12 @@ export const Dashboard: React.FC = () => {
                     <span className="mono">{formatCurrency(costByCategory.shipping)}</span>
                   </div>
                   <div style={styles.plRow}>
-                    <span>• Chi phí nguyên vật liệu</span>
-                    <span className="mono">{formatCurrency(costByCategory.material)}</span>
+                    <span>• Chi phí gia công <span style={{ fontSize: '11px', color: '#8191a9' }}>(Đã gộp trong COGS)</span></span>
+                    <span className="mono" style={{ color: '#8191a9' }}>{formatCurrency(actualOpExpensesInCurPeriod.processing)}</span>
+                  </div>
+                  <div style={styles.plRow}>
+                    <span>• Chi phí nguyên phụ liệu <span style={{ fontSize: '11px', color: '#8191a9' }}>(Đã gộp trong COGS)</span></span>
+                    <span className="mono" style={{ color: '#8191a9' }}>{formatCurrency(actualOpExpensesInCurPeriod.material)}</span>
                   </div>
                   <div style={styles.plRow}>
                     <span>• Chi phí khác</span>
@@ -671,7 +692,7 @@ export const Dashboard: React.FC = () => {
 
             <div className="kpi-card" style={{ borderTop: '3px solid #ba1a1a' }}>
               <div className="kpi-label">Chi phí vận hành</div>
-              <div className="kpi-value mono" style={{ color: '#ba1a1a' }}>{formatCurrency(totalOpExpenses)}</div>
+              <div className="kpi-value mono" style={{ color: '#ba1a1a' }}>{formatCurrency(totalOpExpensesActual)}</div>
               <div className="kpi-desc">
                 <span>Tổng chi phí nhập tay ({filteredExpenses.length} khoản)</span>
               </div>
@@ -724,12 +745,13 @@ export const Dashboard: React.FC = () => {
                   <div style={{ ...styles.plSectionHeader, marginTop: '16px' }}>II. CHI PHÍ VẬN HÀNH</div>
                   <div style={styles.plTotalRow}>
                     <span>Tổng chi phí</span>
-                    <span className="mono font-semibold" style={{ color: '#ba1a1a' }}>{formatCurrency(totalOpExpenses)}</span>
+                    <span className="mono font-semibold" style={{ color: '#ba1a1a' }}>{formatCurrency(totalOpExpensesActual)}</span>
                   </div>
                   {Object.entries(expenseByCategory).map(([key, val]) => {
                     const names: Record<string, string> = {
                       labor: 'Nhân công', rent: 'Mặt bằng', ads: 'Quảng cáo',
-                      shipping: 'Vận chuyển', material: 'Nguyên vật liệu', other: 'Khác',
+                      shipping: 'Vận chuyển', material: 'Nguyên phụ liệu',
+                      processing: 'Gia công', other: 'Khác',
                     };
                     return (
                       <div key={key} style={styles.plRow}>
@@ -804,18 +826,22 @@ export const Dashboard: React.FC = () => {
                   <div>
                     <div style={styles.visualBarLabel}>
                       <span>Chi phí vận hành</span>
-                      <span className="mono">{formatCurrency(totalOpExpenses)}</span>
+                      <span className="mono">{formatCurrency(totalOpExpensesActual)}</span>
                     </div>
-                    {totalOpExpenses === 0 ? (
+                    {totalOpExpensesActual === 0 ? (
                       <div style={styles.emptyBar}>Chưa có chi phí</div>
                     ) : (
                       <div style={styles.visualBarContainer}>
                         {Object.entries(expenseByCategory).map(([key, val]) => {
                           if (val === 0) return null;
-                          const pct = (val / totalOpExpenses) * 100;
+                          const pct = (val / totalOpExpensesActual) * 100;
                           const colors: Record<string, string> = {
                             labor: '#1976d2', rent: '#9c27b0', ads: '#e91e63',
-                            shipping: '#ffeb3b', material: '#4caf50', other: '#9e9e9e',
+                            shipping: '#ffeb3b', material: '#4caf50', processing: '#e65100', other: '#9e9e9e',
+                          };
+                          const names: Record<string, string> = {
+                            labor: 'Nhân công', rent: 'Mặt bằng', ads: 'Quảng cáo',
+                            shipping: 'Vận chuyển', material: 'Nguyên phụ liệu', processing: 'Gia công', other: 'Khác',
                           };
                           return (
                             <div
@@ -824,24 +850,24 @@ export const Dashboard: React.FC = () => {
                                 width: `${pct}%`, backgroundColor: colors[key] || '#ccc',
                                 height: '100%', transition: 'width 0.3s ease',
                               }}
-                              title={`${key}: ${pct.toFixed(1)}% (${formatCurrency(val)})`}
+                              title={`${names[key] || key}: ${pct.toFixed(1)}% (${formatCurrency(val)})`}
                             />
                           );
                         })}
                       </div>
                     )}
-                    {totalOpExpenses > 0 && (
+                    {totalOpExpensesActual > 0 && (
                       <div style={styles.visualLegendGrid}>
                         {Object.entries(expenseByCategory).map(([key, val]) => {
                           if (val === 0) return null;
-                          const pct = (val / totalOpExpenses) * 100;
+                          const pct = (val / totalOpExpensesActual) * 100;
                           const colors: Record<string, string> = {
                             labor: '#1976d2', rent: '#9c27b0', ads: '#e91e63',
-                            shipping: '#ffeb3b', material: '#4caf50', other: '#9e9e9e',
+                            shipping: '#ffeb3b', material: '#4caf50', processing: '#e65100', other: '#9e9e9e',
                           };
                           const names: Record<string, string> = {
                             labor: 'Công', rent: 'Mặt bằng', ads: 'QC',
-                            shipping: 'Ship', material: 'Vật liệu', other: 'Khác',
+                            shipping: 'Ship', material: 'Vật liệu', processing: 'Gia công', other: 'Khác',
                           };
                           return (
                             <div key={key} style={styles.miniLegendItem}>
