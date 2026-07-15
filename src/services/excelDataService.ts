@@ -639,7 +639,7 @@ export const importActualRevenuesFromExcel = (file: File): Promise<ActualRevenue
         const revenues: ActualRevenue[] = [];
 
         // Tìm sheet: ưu tiên "TienThuThucTe", fallback sheet đầu tiên (bỏ HuongDan)
-        let sheetName = wb.SheetNames.find((n) => n === 'TienThuThucTe');
+        let sheetName: string | undefined = wb.SheetNames.find((n) => n === 'TienThuThucTe');
         if (!sheetName) {
           sheetName = wb.SheetNames.find((n) => n !== 'HuongDan');
         }
