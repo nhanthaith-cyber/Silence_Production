@@ -10,7 +10,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import type { Product, ProductionBatch, Sale, Expense, ExcelImportResult } from '../types';
+import type { Product, ProductionBatch, Sale, Expense, ActualRevenue, ActualRevenueSource, ExcelImportResult } from '../types';
 
 // ────────────────────────────────────────────────
 // Helpers
@@ -171,14 +171,30 @@ const VALID_SOURCES = ['shopee', 'tiktok', 'offline', 'manual', 'nhanh_vn'];
 const VALID_EXPENSE_CATS = ['labor', 'rent', 'ads', 'shipping', 'material', 'other'];
 const VALID_STAGES = ['ordered', 'paid', 'shipping', 'producing', 'delivered'];
 const VALID_STATUSES = ['running', 'completed'];
+const VALID_REVENUE_SOURCES: ActualRevenueSource[] = ['shopee', 'tiktok', 'offline', 'bank_transfer', 'cash', 'other'];
 
 const parseDate = (raw: unknown): string => {
   if (raw instanceof Date) return raw.toISOString().slice(0, 10);
-  if (typeof raw === 'string' && raw.trim()) return raw.trim().slice(0, 10);
+  if (typeof raw === 'string' && raw.trim()) {
+    const s = raw.trim();
+    // DD/MM/YYYY or DD/MM/YYYY HH:MM:SS -> YYYY-MM-DD
+    const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (slashMatch) {
+      return `${slashMatch[3]}-${slashMatch[2].padStart(2, '0')}-${slashMatch[1].padStart(2, '0')}`;
+    }
+    return s.slice(0, 10);
+  }
   if (typeof raw === 'number') {
     // Excel serial date
-    const date = XLSX.SSF.parse_date_code(raw);
-    if (date) return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`;
+    try {
+      const date = XLSX.SSF.parse_date_code(raw);
+      if (date) return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`;
+    } catch {
+      // Fallback: manual conversion
+      const excelEpoch = new Date(1899, 11, 30);
+      const jsDate = new Date(excelEpoch.getTime() + raw * 86400000);
+      return jsDate.toISOString().slice(0, 10);
+    }
   }
   return TODAY();
 };
@@ -533,3 +549,152 @@ export const exportForecastToExcel = (forecastData: any[]): void => {
   XLSX.writeFile(wb, `SilenceProduction_Forecast_${timestamp}.xlsx`);
 };
 
+// ────────────────────────────────────────────────
+// ACTUAL REVENUE (Tiền thu thực tế) — EXPORT / TEMPLATE / IMPORT
+// ────────────────────────────────────────────────
+
+const REVENUE_SOURCE_NAMES: Record<string, ActualRevenueSource> = {
+  shopee: 'shopee',
+  tiktok: 'tiktok',
+  offline: 'offline',
+  'chuyen khoan': 'bank_transfer',
+  'chuyển khoản': 'bank_transfer',
+  bank_transfer: 'bank_transfer',
+  'tien mat': 'cash',
+  'tiền mặt': 'cash',
+  cash: 'cash',
+  other: 'other',
+  khac: 'other',
+  'khác': 'other',
+};
+
+const resolveRevenueSource = (raw: string): ActualRevenueSource => {
+  const key = raw.toLowerCase().trim();
+  return REVENUE_SOURCE_NAMES[key] ?? (VALID_REVENUE_SOURCES.includes(key as ActualRevenueSource) ? key as ActualRevenueSource : 'other');
+};
+
+export const exportActualRevenuesToExcel = (revenues: ActualRevenue[]): void => {
+  const wb = XLSX.utils.book_new();
+  const rows = revenues.map((r) => ({
+    ID: r.id,
+    'So tien (VND)': r.amount,
+    'Nguon thu': r.source,
+    'Ngay nhan tien': r.receivedDate,
+    'Ghi chu': r.notes,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [
+    { ID: '', 'So tien (VND)': 0, 'Nguon thu': 'shopee', 'Ngay nhan tien': TODAY(), 'Ghi chu': '' }
+  ]);
+  ws['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 35 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'TienThuThucTe');
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  XLSX.writeFile(wb, `SilenceProduction_TienThu_${timestamp}.xlsx`);
+};
+
+export const generateActualRevenueTemplate = (): void => {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet([
+    { 'So tien (VND)': 5000000, 'Nguon thu': 'shopee', 'Ngay nhan tien': TODAY(), 'Ghi chu': 'Shopee thanh toán đợt 1 tháng 7' },
+    { 'So tien (VND)': 3200000, 'Nguon thu': 'tiktok', 'Ngay nhan tien': TODAY(), 'Ghi chu': 'TikTok rút tiền tuần 2' },
+    { 'So tien (VND)': 1500000, 'Nguon thu': 'bank_transfer', 'Ngay nhan tien': TODAY(), 'Ghi chu': 'Khách chuyển khoản trực tiếp' },
+  ]);
+  ws['!cols'] = [{ wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 40 }];
+
+  // Sheet hướng dẫn
+  const wsGuide = XLSX.utils.json_to_sheet([
+    { TruongBatBuoc: 'So tien (VND)', MoTa: 'Số tiền thu thực tế (phải > 0)' },
+    { TruongBatBuoc: 'Nguon thu', MoTa: 'shopee | tiktok | offline | bank_transfer | cash | other' },
+    { TruongBatBuoc: 'Ngay nhan tien', MoTa: 'Ngày nhận tiền, định dạng YYYY-MM-DD hoặc DD/MM/YYYY' },
+    { TruongBatBuoc: 'Ghi chu', MoTa: '(Tùy chọn) Ghi chú mô tả khoản thu' },
+  ]);
+  wsGuide['!cols'] = [{ wch: 22 }, { wch: 60 }];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'TienThuThucTe');
+  XLSX.utils.book_append_sheet(wb, wsGuide, 'HuongDan');
+  XLSX.writeFile(wb, 'SilenceProduction_TienThu_Template.xlsx');
+};
+
+export interface ActualRevenueImportResult {
+  revenues: ActualRevenue[];
+  warnings: string[];
+  parsedAt: string;
+}
+
+/**
+ * Parse file Excel tiền thu thực tế.
+ * Đọc sheet "TienThuThucTe" hoặc sheet đầu tiên (bỏ qua sheet HuongDan).
+ * Trả về kết quả để UI preview trước khi xác nhận.
+ */
+export const importActualRevenuesFromExcel = (file: File): Promise<ActualRevenueImportResult> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array', cellDates: false });
+
+        const warnings: string[] = [];
+        const revenues: ActualRevenue[] = [];
+
+        // Tìm sheet: ưu tiên "TienThuThucTe", fallback sheet đầu tiên (bỏ HuongDan)
+        let sheetName = wb.SheetNames.find((n) => n === 'TienThuThucTe');
+        if (!sheetName) {
+          sheetName = wb.SheetNames.find((n) => n !== 'HuongDan');
+        }
+        if (!sheetName) {
+          reject(new Error('Không tìm thấy sheet dữ liệu trong file Excel.'));
+          return;
+        }
+
+        const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+
+        rows.forEach((row, idx) => {
+          const amountRaw = row['So tien (VND)'] ?? row['Số tiền (VND)'] ?? row['So tien'] ?? row['Số tiền'] ?? row['amount'];
+          const amount = toNum(amountRaw);
+          const sourceRaw = toStr(row['Nguon thu'] ?? row['Nguồn thu'] ?? row['source'] ?? row['Nguon'] ?? row['Nguồn'] ?? 'other');
+          const dateRaw = row['Ngay nhan tien'] ?? row['Ngày nhận tiền'] ?? row['Ngay'] ?? row['Ngày'] ?? row['receivedDate'];
+          const receivedDate = parseDate(dateRaw);
+          const notes = toStr(row['Ghi chu'] ?? row['Ghi chú'] ?? row['notes'] ?? '');
+          const existingId = toStr(row['ID'] ?? row['id'] ?? '');
+
+          if (amount <= 0) {
+            if (amountRaw !== undefined && amountRaw !== '') {
+              warnings.push(`Dòng ${idx + 2}: Bỏ qua vì Số tiền ≤ 0.`);
+            }
+            return;
+          }
+
+          const source = resolveRevenueSource(sourceRaw);
+          if (!VALID_REVENUE_SOURCES.includes(sourceRaw.toLowerCase() as ActualRevenueSource) && !REVENUE_SOURCE_NAMES[sourceRaw.toLowerCase()]) {
+            warnings.push(`Dòng ${idx + 2}: Nguồn thu "${sourceRaw}" không hợp lệ, đặt thành "other".`);
+          }
+
+          revenues.push({
+            id: existingId || `AREV-XLS-${Date.now()}-${idx}`,
+            amount,
+            source,
+            receivedDate,
+            notes,
+          });
+        });
+
+        if (revenues.length === 0 && rows.length > 0) {
+          warnings.push('Không có dòng dữ liệu hợp lệ nào được đọc từ file.');
+        }
+
+        resolve({
+          revenues,
+          warnings,
+          parsedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        reject(new Error(`Không thể đọc file Excel: ${(err as Error).message}`));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Lỗi đọc file.'));
+    reader.readAsArrayBuffer(file);
+  });
+};
