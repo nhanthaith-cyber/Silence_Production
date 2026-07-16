@@ -19,15 +19,19 @@ Tất cả các hành động tương tác dữ liệu được quản lý tập
 ### 2. Quản lý Lô sản xuất (Production Service)
 
 #### 🔸 `createProductionBatch(batch: Omit<ProductionBatch, 'id' | 'createdAt' | 'currentStage' | 'status'>)`
-- **Logic:** Tạo một mã lô hàng ngẫu nhiên `LOT-YYYYMMDD-XXXX`. Đặt trạng thái ban đầu là `cutting` (Chuẩn bị nguyên liệu), thêm vào danh sách và cập nhật trạng thái kho `In Production` của sản phẩm tương ứng.
+- **Logic:** Tạo một mã lô hàng ngẫu nhiên `LOT-YYYYMMDD-XXXX`. Đặt trạng thái ban đầu là `cutting` (Chuẩn bị nguyên liệu), thêm vào danh sách và khởi tạo mảng items.
+
+#### 🔸 `updateProductionBatch(batchId: string, data: { items?: ProductionBatchItem[]; targetDate?: string })`
+- **Logic:** Cập nhật thông tin chi tiết của lô hàng gồm ngày hoàn thành dự kiến hoặc danh sách mặt hàng (số lượng đặt, số lượng đã trả `deliveredQty`, số lượng lỗi `defectQty`).
+- **Sự kiện đặc biệt:** Tự động so sánh số lượng đã trả mới và cũ để tăng `deliveryCount` (số lần giao hàng) cho từng SKU tương ứng.
 
 #### 🔸 `advanceBatchStage(batchId: string)`
 - **Logic:** Chuyển lô hàng qua các trạng thái kế tiếp:
   `cutting` $\rightarrow$ `sewing` $\rightarrow$ `finishing` $\rightarrow$ `qc` $\rightarrow$ `ready`
 - **Sự kiện đặc biệt:** Khi chuyển sang công đoạn cuối cùng là `ready` (Đóng gói & Nhập kho):
   - Trạng thái lô hàng đánh dấu là `completed`.
-  - Tồn kho khả dụng (Available) của sản phẩm tương ứng được tăng lên một lượng bằng số lượng của lô hàng.
-  - Tồn kho đang sản xuất (In Production) của sản phẩm đó giảm đi.
+  - Tồn kho khả dụng (Available) của sản phẩm tương ứng được tính toán dựa trên tổng số lượng tốt bàn giao thực tế (`deliveredQty - defectQty`) trừ đi đã xuất bán.
+  - Tồn kho đang sản xuất (Còn lại tại xưởng) của sản phẩm đó giảm đi.
 
 ---
 

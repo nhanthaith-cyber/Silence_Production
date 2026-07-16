@@ -28,6 +28,9 @@ erDiagram
     ProductionBatchItem {
         string productSku FK
         number quantity
+        number deliveredQty
+        number defectQty
+        number deliveryCount
     }
     
     Sale {
@@ -78,11 +81,19 @@ Key lưu trữ: `silence_prod_batches`
 | Tên trường | Kiểu dữ liệu | Mô tả | Ví dụ |
 | :--- | :--- | :--- | :--- |
 | `id` | `string` (PK) | Mã lô sản xuất tự động sinh. | `"LOT-20260617-0001"` |
-| `items` | `array` | Danh sách sản phẩm gia công trong lô hàng (chứa SKU & Số lượng). | `[{"productSku": "TS-SILENCE-01", "quantity": 100}]` |
+| `items` | `array` | Danh sách sản phẩm gia công trong lô hàng (chứa SKU, Số lượng đặt, Số lượng đã trả, Số lượng lỗi, Số lần giao). | `[{"productSku": "TS-SILENCE-01", "quantity": 100, "deliveredQty": 80, "defectQty": 5, "deliveryCount": 2}]` |
 | `currentStage` | `string` | Công đoạn hiện tại (`ordered`, `paid`, `shipping`, `producing`, `delivered`). | `"producing"` |
 | `status` | `string` | Trạng thái (`running`, `completed`). | `"running"` |
 | `targetDate` | `string` | Ngày dự kiến hoàn thành sản xuất. | `"2026-06-25"` |
 | `createdAt` | `string` | Ngày khởi tạo lô hàng. | `"2026-06-17"` |
+
+#### Chi tiết đối tượng trong mảng `items` (ProductionBatchItem):
+- `productSku` (string): Mã SKU sản phẩm.
+- `quantity` (number): Số lượng sản phẩm yêu cầu sản xuất trong lệnh.
+- `deliveredQty` (number, optional): Số lượng sản phẩm thực tế đã nhận bàn giao từ xưởng gia công.
+- `defectQty` (number, optional): Số lượng sản phẩm bị lỗi trong số sản phẩm đã nhận bàn giao.
+- `deliveryCount` (number, optional): Số lần bàn giao hàng của lô sản phẩm này từ xưởng.
+
 
 ### 3. Bảng `sales` (Đơn hàng đã bán)
 Key lưu trữ: `silence_prod_sales`

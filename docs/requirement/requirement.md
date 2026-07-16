@@ -37,9 +37,16 @@ Tài liệu này xác định chi tiết các yêu cầu chức năng và phi ch
   3. **Hoàn thiện (Finishing):** Ủi, làm sạch, gắn nhãn mác.
   4. **Kiểm định chất lượng (Quality Control - QC):** Đo đạc thông số, loại bỏ hàng lỗi.
   5. **Đóng gói & Nhập kho (Packaging/Ready):** Đóng gói thành phẩm và nhập kho.
-- **Thao tác:**
-  - Bấm nút để chuyển lô hàng sang công đoạn tiếp theo.
-  - Khi lô hàng đạt trạng thái **Đóng gói & Nhập kho (Ready)**, hệ thống tự động cộng số lượng thành phẩm vào kho lưu trữ (tồn kho khả dụng - Available).
+- **Thao tác & Popup chi tiết:**
+  - **Xem chi tiết lệnh:** Click "Chi tiết" trên từng card lô hàng để mở Popup xem chi tiết:
+    - Hiển thị summary 5 chỉ số: **Tổng đặt**, **Đã trả từ xưởng**, **Lỗi**, **Hàng tốt (deliveredQty − defectQty)**, **Còn lại chưa trả**.
+    - Hiển thị tiến trình 5 bước trực quan kèm badge "HIỆN TẠI".
+    - Bảng danh sách SKU trong lô kèm tiến độ hoàn thành (%) và số lần giao hàng.
+  - **Chỉnh sửa lệnh sản xuất:** Hỗ trợ cập nhật số lượng đặt, số lượng đã trả (`deliveredQty`), và số lượng hàng lỗi (`defectQty`) cho từng SKU.
+    - Cột "Còn lại" và "Hàng tốt" tự động tính toán thời gian thực.
+    - Cho phép thay đổi ngày hoàn thành dự kiến.
+    - Tự động tăng **Số lần giao hàng (deliveryCount)** mỗi khi số lượng đã trả tăng lên so với giá trị trước đó.
+  - Bấm nút để chuyển nhanh lô hàng sang công đoạn tiếp theo. Khi chuyển sang công đoạn kế tiếp, trạng thái mới được ghi nhận.
 
 ### 3. Nhập chi phí nhanh & Đồng bộ kênh bán (Quick Cost & Sync)
 - **Ghi nhận chi phí vận hành:**
@@ -50,9 +57,11 @@ Tài liệu này xác định chi tiết các yêu cầu chức năng và phi ch
 
 ### 4. Quản lý tồn kho chuyên sâu (Deep Inventory)
 - **Quản lý trạng thái tồn kho:**
-  - **Tồn kho khả dụng (Available):** Hàng đã hoàn thành sản xuất, sẵn sàng bán.
-  - **Đang sản xuất (In Production):** Tổng số lượng sản phẩm nằm trong các lô sản xuất chưa hoàn thành (từ công đoạn 1 đến 4).
-  - **Đã bán (Sold):** Tổng số lượng đã xuất kho bán thành công.
+  - **Tồn kho khả dụng (Available):** Bằng `Hàng tốt thực nhận từ xưởng − Đã xuất bán`. Hàng tốt thực nhận được tính bằng `deliveredQty − defectQty` cho từng SKU trên mọi lô sản xuất (kể cả đang chạy hoặc đã hoàn thành). Nếu sản phẩm đã được đồng bộ `nhanhStock` từ Nhanh.vn thì ưu tiên hiển thị `nhanhStock`.
+  - **Còn lại tại xưởng (In Production):** Số lượng sản phẩm còn lại đang nằm tại xưởng gia công chưa bàn giao (`quantity − deliveredQty` của các lô đang sản xuất).
+  - **Đã bán (Sold):** Tổng số lượng đã xuất kho bán lẻ thành công.
+- **Bảng chi tiết tồn kho:**
+  - Bổ sung cột hiển thị **Đã trả từ xưởng** (tổng số lượng tốt đã nhận) và cột **Tồn nguồn** (để biết số tồn hiển thị được lấy từ Nhanh.vn hay tính toán thực tế từ xưởng).
 - **Cảnh báo tồn kho thấp (Low Stock Alert):**
   - Tự động hiển thị nhãn cảnh báo đỏ đối với các sản phẩm có tồn kho khả dụng dưới 20 đơn vị.
 

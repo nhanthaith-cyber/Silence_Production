@@ -29,25 +29,29 @@ Hiển thị 3 chỉ số tổng hợp toàn hệ thống:
 1. **Tồn kho khả dụng (Available):**
    - Tổng số lượng thành phẩm đã hoàn thành sản xuất tại xưởng và chưa bán (màu Navy đậm, font Monospace lớn).
    - Biểu tượng hộp hàng (Boxes) đi kèm mô tả ngắn: "Thành phẩm đã hoàn thành, sẵn sàng bán".
-2. **Số lượng đang sản xuất (In Production):**
-   - Tổng số sản phẩm đang nằm trong các lô hàng chưa hoàn thành ở xưởng (màu Amber `#b45309`, font Monospace lớn).
-   - Biểu tượng thêm sản phẩm (PackagePlus) đi kèm mô tả ngắn: "Nằm trong các công đoạn xưởng gia công".
+2. **Còn lại tại xưởng (Remaining):**
+   - Tổng số sản phẩm đặt sản xuất nhưng chưa nhận về từ xưởng, tính bằng `quantity - deliveredQty` (màu Amber `#b45309`, font Monospace lớn).
+   - Biểu tượng thêm sản phẩm (PackagePlus) đi kèm mô tả ngắn: "Đặt nhưng chưa nhận về (quantity − đã trả)".
 3. **Tổng sản phẩm đã bán (Sold):**
    - Tổng số lượng sản phẩm đã được bán ra thành công (màu Sage Green `#006c49`, font Monospace lớn).
    - Biểu tượng túi mua sắm (ShoppingBag) đi kèm mô tả ngắn: "Đã xuất kho qua các kênh bán hàng".
 
 ### C. Thẻ bảng chi tiết tồn kho theo SKU (Inventory Details Card)
 - **Tiêu đề bảng:** "Chi tiết số lượng tồn kho theo SKU" (kèm nhãn cảnh báo phụ "Cảnh báo mức tồn thấp: < 20 SP").
-- **Bảng dữ liệu chi tiết (Data Table):** Cấu trúc bảng gồm 7 cột:
+- **Bảng dữ liệu chi tiết (Data Table):** Cấu trúc bảng gồm 9 cột:
   1. **Mã SKU:** Định dạng in đậm, viết hoa toàn bộ, font Monospace (ví dụ: `TS-SILENCE-01`).
   2. **Tên Sản Phẩm:** Tên hiển thị đầy đủ của sản phẩm, in đậm nhẹ.
-  3. **Đang sản xuất:** Số lượng sản phẩm đang gia công (font Monospace, căn phải. Nếu $> 0$, hiển thị màu hổ phách và in đậm nhẹ; nếu $= 0$, hiển thị màu xám mờ).
-  4. **Khả dụng (Available):** Số lượng thành phẩm hiện tại trong kho (font Monospace in đậm, căn phải. Nếu số lượng $< 20$, hiển thị màu đỏ đô `#ba1a1a` nổi bật để báo động).
-  5. **Đã xuất bán:** Tổng số sản phẩm đã bán thành công (font Monospace, căn phải, màu xám nhạt).
-  6. **Trạng thái tồn:** Hiển thị Badge trạng thái:
+  3. **Đang sản xuất:** Số lượng sản phẩm còn lại chưa trả từ xưởng (`quantity - deliveredQty`, font Monospace, căn phải. Nếu $> 0$, hiển thị màu hổ phách; nếu $= 0$, hiển thị màu xám mờ).
+  4. **Đã trả từ xưởng:** Tổng số lượng hàng tốt thực tế đã nhận bàn giao từ xưởng (`deliveredQty - defectQty`, font Monospace, căn phải, màu xanh lá đậm). Nếu chưa bàn giao lần nào thì hiển thị `—`.
+  5. **Khả dụng:** Số lượng tồn kho khả dụng để xuất bán (font Monospace in đậm, căn phải. Nếu số lượng dưới 20, hiển thị màu đỏ đô `#ba1a1a` nổi bật).
+  6. **Đã xuất bán:** Tổng số sản phẩm đã bán thành công (font Monospace, căn phải, màu xám nhạt).
+  7. **Tồn nguồn:** Hiển thị nguồn của số lượng tồn khả dụng hiện tại:
+     - Badge màu xanh dương `Nhanh.vn` nếu dữ liệu được đồng bộ từ API.
+     - Badge màu xanh lá `Từ xưởng` nếu tính toán nội bộ dựa trên số lượng bàn giao thực tế trừ đi số lượng đã bán.
+  8. **Trạng thái tồn:** Hiển thị Badge trạng thái:
      - Nhãn đỏ "Tồn kho thấp" kèm icon cảnh báo nếu Khả dụng $< 20$.
      - Nhãn xanh "Đủ hàng" kèm icon tích xanh nếu Khả dụng $\ge 20$.
-  7. **Đồng bộ Nhanh:** Nút bấm phụ "Đẩy tồn" (nút nhỏ compact, font chữ bé, viền xám). Khi click, đẩy riêng số tồn khả dụng của SKU này lên Nhanh.vn.
-- *Trạng thái trống:* Nếu hệ thống chưa có SKU nào, hiển thị dòng thông báo "Chưa có sản phẩm nào trong hệ thống." ở giữa bảng.
-Phần sản phẩm có nhiều SKU thì dùng chế độ mở nhiều trang để xem, mỗi trang 30 SKU
-Phần sản phẩm thêm vùng để tìm kiếm SKU
+  9. **Đồng bộ Nhanh:** Nút bấm phụ "Đẩy tồn" (nút nhỏ compact, font chữ bé, viền xám). Khi click, đẩy riêng số tồn khả dụng của SKU này lên Nhanh.vn.
+- *Trạng thái trống:* Nếu hệ thống chưa có SKU nào khớp, hiển thị dòng thông báo "Không tìm thấy sản phẩm nào khớp với từ khóa tìm kiếm." hoặc "Chưa có sản phẩm nào trong hệ thống." ở giữa bảng (colSpan = 9).
+- Phân trang: Mỗi trang hiển thị tối đa 30 SKU, có nút chuyển trang linh hoạt ở chân bảng.
+- Thanh tìm kiếm: Đặt ngay phía trên bảng để lọc sản phẩm nhanh theo mã SKU hoặc tên sản phẩm.
