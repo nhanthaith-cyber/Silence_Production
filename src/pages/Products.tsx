@@ -450,7 +450,7 @@ export const Products: React.FC = () => {
                     const totalSold = sales
                       .filter(s => s.productSku === prod.sku)
                       .reduce((sum, s) => sum + s.quantity, 0);
-                    const availableStock = Math.max(0, totalReady - totalSold);
+                    const availableStock = prod.nhanhStock !== undefined ? prod.nhanhStock : Math.max(0, totalReady - totalSold);
 
                     return (
                       <tr key={prod.sku}>

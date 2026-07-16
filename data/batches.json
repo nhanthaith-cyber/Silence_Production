@@ -1,1 +1,162 @@
-[]
+[
+  {
+    "id": "S590",
+    "items": [
+      {
+        "productSku": "SI01-SO06-WH-S",
+        "quantity": 144
+      },
+      {
+        "productSku": "SI01-SO06-WH-M",
+        "quantity": 72
+      },
+      {
+        "productSku": "SI01-SO02-BU-XS",
+        "quantity": 100
+      }
+    ],
+    "currentStage": "ordered",
+    "status": "running",
+    "createdAt": "2026-07-09T00:00:00.000Z",
+    "targetDate": "2026-08-04"
+  },
+  {
+    "id": "S506",
+    "items": [
+      {
+        "productSku": "SI01-SO02-BU-S",
+        "quantity": 36
+      },
+      {
+        "productSku": "SI01-SO02-BU-M",
+        "quantity": 72
+      },
+      {
+        "productSku": "SI01-SO02-BU-L",
+        "quantity": 72
+      },
+      {
+        "productSku": "SI01-SO02-BU-XL",
+        "quantity": 36
+      },
+      {
+        "productSku": "SI01-SO02-RD-M",
+        "quantity": 30
+      },
+      {
+        "productSku": "SI01-SO02-RD-S",
+        "quantity": 57
+      },
+      {
+        "productSku": "SI01-SO02-RD-XS",
+        "quantity": 57
+      },
+      {
+        "productSku": "SI01-SO02-BE-M",
+        "quantity": 12
+      },
+      {
+        "productSku": "SI01-SO02-BE-L",
+        "quantity": 12
+      },
+      {
+        "productSku": "SI01-SO02-BE-S",
+        "quantity": 24
+      },
+      {
+        "productSku": "SI01-SO02-BE-XS",
+        "quantity": 24
+      }
+    ],
+    "currentStage": "ordered",
+    "status": "running",
+    "createdAt": "2026-06-30T00:00:00.000Z",
+    "targetDate": "2026-07-28"
+  },
+  {
+    "id": "S507",
+    "items": [
+      {
+        "productSku": "SI01-SO06-NV-S",
+        "quantity": 12
+      },
+      {
+        "productSku": "SI01-SO06-NV-M",
+        "quantity": 24
+      },
+      {
+        "productSku": "SI01-SO06-NV-L",
+        "quantity": 24
+      },
+      {
+        "productSku": "SI01-SO06-NV-XL",
+        "quantity": 12
+      },
+      {
+        "productSku": "SI01-SO06-WH-XS",
+        "quantity": 48
+      },
+      {
+        "productSku": "SI01-SO06-WH-S",
+        "quantity": 48
+      },
+      {
+        "productSku": "SI01-SO06-WH-M",
+        "quantity": 96
+      },
+      {
+        "productSku": "SI01-SO06-WH-L",
+        "quantity": 48
+      },
+      {
+        "productSku": "SI01-SO06-WH-XL",
+        "quantity": 48
+      }
+    ],
+    "currentStage": "ordered",
+    "status": "running",
+    "createdAt": "2026-06-30T00:00:00.000Z",
+    "targetDate": "2026-07-28"
+  },
+  {
+    "id": "S508",
+    "items": [
+      {
+        "productSku": "SI01-SO25-NV-S",
+        "quantity": 24
+      },
+      {
+        "productSku": "SI01-SO25-NV-M",
+        "quantity": 48
+      },
+      {
+        "productSku": "SI01-SO25-NV-L",
+        "quantity": 48
+      },
+      {
+        "productSku": "SI01-SO25-NV-XL",
+        "quantity": 24
+      },
+      {
+        "productSku": "SI01-SO25-WH-XS",
+        "quantity": 24
+      },
+      {
+        "productSku": "SI01-SO25-WH-S",
+        "quantity": 48
+      },
+      {
+        "productSku": "SI01-SO25-WH-M",
+        "quantity": 48
+      },
+      {
+        "productSku": "SI01-SO25-WH-L",
+        "quantity": 24
+      }
+    ],
+    "currentStage": "ordered",
+    "status": "running",
+    "createdAt": "2026-06-30T00:00:00.000Z",
+    "targetDate": "2026-07-28"
+  }
+]

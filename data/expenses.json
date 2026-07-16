@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "EXP-001",
+    "category": "other",
+    "amount": 96000000,
+    "expenseDate": "2026-07-10",
+    "notes": "Lương nhân viên Kho và mẫu livestream"
+  },
+  {
+    "id": "EXP-002",
+    "category": "other",
+    "amount": 46000000,
+    "expenseDate": "2026-07-07",
+    "notes": "Thuê kho 209, 3 tháng"
+  }
+]
