@@ -15,6 +15,12 @@ export type ProductionStage = 'ordered' | 'paid' | 'shipping' | 'producing' | 'd
 export interface ProductionBatchItem {
   productSku: string;
   quantity: number;
+  /** Số lượng hàng đã trả từ xưởng (thực nhận) — ghi nhận từng đợt giao */
+  deliveredQty?: number;
+  /** Số lượng hàng lỗi — khấu trừ khỏi tồn kho thực tế */
+  defectQty?: number;
+  /** Số lần xưởng giao hàng — tự động tăng mỗi khi deliveredQty được cập nhật */
+  deliveryCount?: number;
 }
 
 export interface ProductionBatch {
@@ -116,6 +122,7 @@ export interface AppContextType {
   createProductionBatch: (batch: { items: ProductionBatchItem[]; targetDate: string }) => void;
   advanceBatchStage: (batchId: string) => void;
   deleteProductionBatch: (batchId: string) => void;
+  updateProductionBatch: (batchId: string, data: { items?: ProductionBatchItem[]; targetDate?: string }) => void;
   addSale: (sale: Omit<Sale, 'id' | 'saleDate'>) => void;
   addExpense: (expense: Omit<Expense, 'id' | 'expenseDate'>) => void;
 

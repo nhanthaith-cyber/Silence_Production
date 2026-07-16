@@ -386,6 +386,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createAndSaveActionLog('Xóa lệnh sản xuất', `Đã xóa lô sản xuất: ${batchId}.`, 'production');
   };
 
+  const updateProductionBatch = (
+    batchId: string,
+    data: { items?: import('../types').ProductionBatchItem[]; targetDate?: string }
+  ) => {
+    const updated = productionBatches.map((batch) => {
+      if (batch.id !== batchId) return batch;
+
+      // Auto-increment deliveryCount khi deliveredQty tăng lên
+      const newItems = data.items
+        ? data.items.map((newItem) => {
+            const oldItem = batch.items.find((i) => i.productSku === newItem.productSku);
+            const oldDelivered = oldItem?.deliveredQty ?? 0;
+            const newDelivered = newItem.deliveredQty ?? 0;
+            const oldCount = oldItem?.deliveryCount ?? 0;
+            // Chỉ tăng deliveryCount khi số lượng đã trả thực sự tăng lên
+            const deliveryCount = newDelivered > oldDelivered ? oldCount + 1 : oldCount;
+            return { ...newItem, deliveryCount };
+          })
+        : batch.items;
+
+      return {
+        ...batch,
+        items: newItems,
+        ...(data.targetDate ? { targetDate: data.targetDate } : {}),
+      };
+    });
+    setProductionBatches(updated);
+    saveToLocal('silence_prod_batches', updated);
+    const changedBatch = updated.find((b) => b.id === batchId);
+    const itemsDesc = changedBatch?.items.map((i) =>
+      `${i.productSku}: SL=${i.quantity}, Đã trả=${i.deliveredQty ?? 0}, Lỗi=${i.defectQty ?? 0}, Lần giao=${i.deliveryCount ?? 0}`
+    ).join(', ') ?? '';
+    createAndSaveActionLog(
+      'Cập nhật lệnh sản xuất',
+      `Cập nhật lô ${batchId}: ${itemsDesc}.`,
+      'production'
+    );
+  };
+
   const addSale = (saleData: Omit<Sale, 'id' | 'saleDate'>) => {
     const today = getTodayISO();
     const newSale: Sale = {
@@ -779,6 +818,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createProductionBatch,
         advanceBatchStage,
         deleteProductionBatch,
+        updateProductionBatch,
         addSale,
         addExpense,
         addActualRevenue,

@@ -83,8 +83,10 @@ export const Inventory: React.FC = () => {
     name: string;
     inProduction: number;
     sold: number;
+    totalDelivered: number;   // Tổng đã trả từ xưởng
     available: number;
     isLowStock: boolean;
+    stockSource: 'nhanh' | 'delivered'; // Nguồn tính tồn
   }
 
   // State for search and pagination
@@ -95,39 +97,58 @@ export const Inventory: React.FC = () => {
   // Calculate inventory metrics by product
   const inventoryData: InventoryItem[] = useMemo(() => {
     return products.map((prod) => {
-      // 1. In Production = Running batches quantity
+      // 1. inProduction = Số lượng CÒN LẠI đang ở xưởng (chưa trả về)
+      //    = quantity - deliveredQty (cho mỗi item của running batches)
+      //    Nếu item chưa có deliveredQty → toàn bộ quantity vẫn đang ở xưởng
       const inProduction = productionBatches
         .filter((b) => b.status === 'running')
         .reduce((sum, b) => {
-          const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
-          return sum + itemQty;
+          const itemRemaining = b.items
+            .filter((i) => i.productSku === prod.sku)
+            .reduce((s, i) => {
+              const delivered = i.deliveredQty ?? 0;
+              return s + Math.max(0, i.quantity - delivered);
+            }, 0);
+          return sum + itemRemaining;
         }, 0);
 
-      // 2. Ready (total produced) = Completed batches quantity
-      const totalProduced = productionBatches
-        .filter((b) => b.status === 'completed')
-        .reduce((sum, b) => {
-          const itemQty = b.items.filter((i) => i.productSku === prod.sku).reduce((s, i) => s + i.quantity, 0);
-          return sum + itemQty;
-        }, 0);
+      // 2. totalDelivered = Tổng hàng TỐT đã nhận từ xưởng (deliveredQty − defectQty)
+      //    Backward compat: item chưa có deliveredQty → fallback về quantity của completed batch
+      const totalDelivered = productionBatches.reduce((sum, b) => {
+        const itemDelivered = b.items
+          .filter((i) => i.productSku === prod.sku)
+          .reduce((s, i) => {
+            if (i.deliveredQty !== undefined) {
+              const good = i.deliveredQty - (i.defectQty ?? 0);
+              return s + Math.max(0, good);
+            }
+            // Nếu chưa có deliveredQty: chỉ tính khi batch đã completed
+            if (b.status === 'completed') return s + i.quantity;
+            return s;
+          }, 0);
+        return sum + itemDelivered;
+      }, 0);
 
       // 3. Sold = Sales quantity
       const sold = sales
         .filter((s) => s.productSku === prod.sku)
         .reduce((sum, s) => sum + s.quantity, 0);
 
-      // 4. Available = Tồn kho thực tế
-      // Ưu tiên dùng số lượng nhanhStock đồng bộ từ Nhanh.vn (nếu có).
-      // Nếu chưa đồng bộ, dùng công thức nội bộ = Tổng sản xuất xong - Đã bán lẻ.
-      const available = prod.nhanhStock !== undefined ? prod.nhanhStock : (totalProduced - sold);
+      // 4. Available = Tồn kho chuẩn
+      // Chỉ dùng nhanhStock khi đã sync và có giá trị đáng tin cậy (không phải undefined/null)
+      // Nếu chưa sync Nhanh.vn: Tồn = Tổng đã trả từ xưởng - Đã bán
+      const useNhanh = prod.nhanhStock !== undefined && prod.nhanhStock !== null;
+      const available = useNhanh ? prod.nhanhStock! : Math.max(0, totalDelivered - sold);
 
       return {
         sku: prod.sku,
         name: prod.name,
         inProduction,
         sold,
+        totalDelivered,
         available,
         isLowStock: available < 20,
+        stockSource: useNhanh ? 'nhanh' : 'delivered',
       };
     });
   }, [products, productionBatches, sales]);
@@ -214,11 +235,11 @@ export const Inventory: React.FC = () => {
         </div>
 
         <div className="kpi-card kpi-warning">
-          <div className="kpi-label">Số lượng đang sản xuất</div>
+          <div className="kpi-label">Còn lại tại xưởng</div>
           <div className="kpi-value mono" style={{ color: '#b45309' }}>{formatNumber(totalInProduction)}</div>
           <div className="kpi-desc" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <PackagePlus size={14} style={{ color: '#b45309' }} />
-            <span>Nằm trong các công đoạn xưởng gia công</span>
+            <span>Đặt nhưng chưa nhận về (quantity − đã trả)</span>
           </div>
         </div>
 
@@ -397,8 +418,10 @@ export const Inventory: React.FC = () => {
                 <th>Mã SKU</th>
                 <th>Tên Sản Phẩm</th>
                 <th style={{ textAlign: 'right' }}>Đang sản xuất</th>
-                <th style={{ textAlign: 'right' }}>Khả dụng (Available)</th>
+                <th style={{ textAlign: 'right' }}>Đã trả từ xưởng</th>
+                <th style={{ textAlign: 'right' }}>Khả dụng</th>
                 <th style={{ textAlign: 'right' }}>Đã xuất bán</th>
+                <th>Tồn nguồn</th>
                 <th>Trạng thái tồn</th>
                 <th>Đồng bộ Nhanh</th>
               </tr>
@@ -406,7 +429,7 @@ export const Inventory: React.FC = () => {
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#8191a9', padding: '24px' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', color: '#8191a9', padding: '24px' }}>
                     {searchTerm ? 'Không tìm thấy sản phẩm nào khớp với từ khóa tìm kiếm.' : 'Chưa có sản phẩm nào trong hệ thống.'}
                   </td>
                 </tr>
@@ -418,11 +441,30 @@ export const Inventory: React.FC = () => {
                     <td className="mono" style={{ textAlign: 'right', color: data.inProduction > 0 ? '#b45309' : '#75777d', fontWeight: data.inProduction > 0 ? 600 : 400 }}>
                       {formatNumber(data.inProduction)}
                     </td>
+                    {/* Cột Đã trả từ xưởng */}
+                    <td className="mono" style={{ textAlign: 'right', color: data.totalDelivered > 0 ? '#006c49' : '#75777d', fontWeight: data.totalDelivered > 0 ? 700 : 400 }}>
+                      {data.totalDelivered > 0 ? formatNumber(data.totalDelivered) : '—'}
+                    </td>
+                    {/* Cột Khả dụng với badge nguồn */}
                     <td className="mono" style={{ textAlign: 'right', fontWeight: 700, color: data.isLowStock ? '#ba1a1a' : '#091426' }}>
-                      {formatNumber(data.available)}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                        {formatNumber(data.available)}
+                      </div>
                     </td>
                     <td className="mono" style={{ textAlign: 'right', color: '#75777d' }}>
                       {formatNumber(data.sold)}
+                    </td>
+                    {/* Cột nguồn tồn */}
+                    <td>
+                      {data.stockSource === 'nhanh' ? (
+                        <span style={{ fontSize: '11px', backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: '20px', fontWeight: 600, border: '1px solid #bfdbfe' }}>
+                          Nhanh.vn
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', backgroundColor: '#f0fdf4', color: '#15803d', padding: '2px 8px', borderRadius: '20px', fontWeight: 600, border: '1px solid #bbf7d0' }}>
+                          Từ xưởng
+                        </span>
+                      )}
                     </td>
                     <td>
                       {data.isLowStock ? (
