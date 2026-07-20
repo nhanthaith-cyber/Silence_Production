@@ -1,8 +1,8 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { useApp } from '../hooks/useApp';
 import { formatNumber } from '../utils/formatters';
-import { Boxes, PackagePlus, ShoppingBag, AlertTriangle, CheckCircle2, RefreshCw, FileSpreadsheet, FileDown, Upload, AlertCircle } from 'lucide-react';
-import { exportInventoryToExcel, importFromExcel } from '../services/excelDataService';
+import { Boxes, PackagePlus, ShoppingBag, AlertTriangle, CheckCircle2, RefreshCw, FileSpreadsheet, FileDown, Upload, AlertCircle, Download } from 'lucide-react';
+import { exportInventoryToExcel, generateInventoryTemplate, importFromExcel } from '../services/excelDataService';
 import type { ExcelImportResult } from '../types';
 
 export const Inventory: React.FC = () => {
@@ -262,7 +262,15 @@ export const Inventory: React.FC = () => {
             <p style={{ fontSize: '12px', color: '#8191a9', margin: 0 }}>Xuất báo cáo tồn kho hiện tại hoặc tải file Excel lên để cập nhật tồn kho (nhanhStock) cho các SKU.</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => generateInventoryTemplate()}
+            className="btn btn-secondary"
+            style={{ gap: '6px', fontSize: '13px' }}
+          >
+            <Download size={14} />
+            <span>Tải file mẫu</span>
+          </button>
           <button
             onClick={() => exportInventoryToExcel(inventoryData)}
             className="btn btn-secondary"

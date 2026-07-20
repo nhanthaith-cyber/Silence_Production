@@ -527,6 +527,37 @@ export const exportInventoryToExcel = (inventoryData: any[]): void => {
   XLSX.writeFile(wb, `SilenceProduction_Inventory_${timestamp}.xlsx`);
 };
 
+/**
+ * Tạo file Excel mẫu cho import tồn kho.
+ * Chỉ có 3 cột: SKU, Tên sản phẩm, Tồn kho Nhanh.vn
+ * Người dùng điền số liệu tồn kho rồi upload lại.
+ */
+export const generateInventoryTemplate = (): void => {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet dữ liệu mẫu
+  const ws = XLSX.utils.json_to_sheet([
+    { SKU: 'AO-THUN-01', 'Ten san pham': 'Áo thun Silence Classic', 'Gia goc (VND)': 65000, 'Gia ban (VND)': 150000, 'Ton kho Nhanh.vn': 120 },
+    { SKU: 'AO-KHOAC-02', 'Ten san pham': 'Áo khoác Silence Premium', 'Gia goc (VND)': 120000, 'Gia ban (VND)': 280000, 'Ton kho Nhanh.vn': 45 },
+  ]);
+  ws['!cols'] = [{ wch: 18 }, { wch: 35 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Products');
+
+  // Sheet hướng dẫn
+  const wsGuide = XLSX.utils.json_to_sheet([
+    { Cot: 'SKU', BatBuoc: 'Có', MoTa: 'Mã SKU sản phẩm — phải trùng với SKU đã có trong hệ thống' },
+    { Cot: 'Ten san pham', BatBuoc: 'Có', MoTa: 'Tên sản phẩm (dùng để đối chiếu, không thay đổi tên)' },
+    { Cot: 'Gia goc (VND)', BatBuoc: 'Không', MoTa: 'Giá gốc — bỏ trống nếu không muốn thay đổi' },
+    { Cot: 'Gia ban (VND)', BatBuoc: 'Không', MoTa: 'Giá bán — bỏ trống nếu không muốn thay đổi' },
+    { Cot: 'Ton kho Nhanh.vn', BatBuoc: 'Có', MoTa: 'Số lượng tồn kho cần cập nhật (nhanhStock)' },
+    { Cot: '--- Lưu ý ---', BatBuoc: '', MoTa: 'Xóa các dòng ví dụ trước khi import. Chỉ giữ dữ liệu thật.' },
+  ]);
+  wsGuide['!cols'] = [{ wch: 22 }, { wch: 10 }, { wch: 65 }];
+  XLSX.utils.book_append_sheet(wb, wsGuide, 'HuongDan');
+
+  XLSX.writeFile(wb, 'SilenceProduction_TonKho_Template.xlsx');
+};
+
 export const exportForecastToExcel = (forecastData: any[]): void => {
   const wb = XLSX.utils.book_new();
   const rows = forecastData.map((d) => ({
