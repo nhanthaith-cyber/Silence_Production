@@ -19,7 +19,6 @@ import {
   onSyncStatusChange,
   isLocalPushInProgress,
   markLocalPushInProgress,
-  getSyncStatus,
   type FirebaseDataPath,
 } from '../services/firebaseSyncService';
 import type { Unsubscribe } from 'firebase/database';

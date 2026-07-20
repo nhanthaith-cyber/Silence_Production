@@ -343,9 +343,9 @@ export const Settings: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const json = event.target?.result as string;
-      const result = importAllData(json);
+      const result = await importAllData(json);
       setImportResult({
         ok: result.success,
         msg: result.success
