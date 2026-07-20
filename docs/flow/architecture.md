@@ -248,3 +248,12 @@ graph LR
 - **Triggers:** Bat ky push/merge nao toi nhanh `main` deu tu dong kich hoat luong chay.
 - **Hosting:** GitHub Pages.
 
+### Cau hinh Firebase khi Deploy (Firebase Config on Deploy)
+
+Do file `.env.local` chua thong tin cau hinh Firebase khong duoc commit len Git (nam trong `.gitignore`), khi GitHub Actions thuc hien build tu dong se khong co cac bien moi truong nay.
+
+De giai quyet, he thong su dung **Co che Fallback tinh (Static Fallback)** trong file `src/services/firebaseConfig.ts`:
+1. He thong uu tien doc tu `import.meta.env.VITE_FIREBASE_*`.
+2. Neu khong co (tren GitHub Pages live), he thong se tu dong su dung thong tin cau hinh mac dinh duoc khai bao san trong code de tu dong ket noi toi Firebase Realtime Database ma khong can thiet lap thu cong hay truyen bien moi truong khi build.
+
+
