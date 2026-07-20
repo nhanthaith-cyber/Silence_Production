@@ -1,0 +1,65 @@
+/**
+ * Firebase Configuration — Khởi tạo Firebase App và Realtime Database
+ *
+ * Config được đọc từ biến môi trường (.env.local).
+ * Nếu thiếu config → Firebase sẽ bị tắt, app vẫn chạy bình thường với LocalStorage.
+ */
+
+import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getDatabase, type Database } from 'firebase/database';
+
+// Đọc config từ biến môi trường Vite
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+};
+
+/** Kiểm tra xem Firebase config có hợp lệ (đã được cấu hình) hay chưa */
+export const isFirebaseConfigured = (): boolean => {
+  return !!(firebaseConfig.apiKey && firebaseConfig.databaseURL && firebaseConfig.projectId);
+};
+
+let app: FirebaseApp | null = null;
+let database: Database | null = null;
+
+/**
+ * Khởi tạo Firebase App và Database instance.
+ * Trả về null nếu config không hợp lệ (chưa setup Firebase).
+ */
+export const initFirebase = (): { app: FirebaseApp; database: Database } | null => {
+  if (!isFirebaseConfigured()) {
+    console.warn(
+      '[Firebase] ⚠️ Firebase chưa được cấu hình. App sẽ chạy ở chế độ LocalStorage only.',
+      'Hãy thêm các biến VITE_FIREBASE_* vào file .env.local'
+    );
+    return null;
+  }
+
+  try {
+    if (!app) {
+      app = initializeApp(firebaseConfig);
+      console.log('[Firebase] ✅ Firebase App đã khởi tạo thành công.');
+    }
+
+    if (!database) {
+      database = getDatabase(app);
+      console.log('[Firebase] ✅ Realtime Database đã kết nối:', firebaseConfig.databaseURL);
+    }
+
+    return { app, database };
+  } catch (error) {
+    console.error('[Firebase] ❌ Lỗi khởi tạo Firebase:', error);
+    return null;
+  }
+};
+
+/** Lấy Database instance (có thể null nếu chưa init hoặc config sai) */
+export const getFirebaseDatabase = (): Database | null => database;
+
+/** Lấy Firebase App instance */
+export const getFirebaseApp = (): FirebaseApp | null => app;

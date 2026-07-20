@@ -62,7 +62,7 @@ export const Expenses: React.FC = () => {
     }
   };
 
-  const handleConfirmExcelImport = () => {
+  const handleConfirmExcelImport = async () => {
     if (!excelPreview) return;
     
     let finalSales = sales;
@@ -93,7 +93,7 @@ export const Expenses: React.FC = () => {
       expenses: finalExpenses,
     });
 
-    const result = importAllData(jsonStr);
+    const result = await importAllData(jsonStr);
     if (result.success) {
       const mode = excelImportMode === 'overwrite' ? 'Ghi đè' : 'Thêm mới';
       const targetLabel = excelTarget === 'sales' ? 'đơn bán hàng' : 'chi phí';
@@ -101,7 +101,7 @@ export const Expenses: React.FC = () => {
       setExcelSuccess(`✅ [${mode}] Import ${targetLabel} thành công: ${count} dòng.`);
       setShowExcelConfirm(false);
       setExcelPreview(null);
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => window.location.reload(), 3000);
     } else {
       setExcelError(`Lỗi import: ${result.error}`);
       setShowExcelConfirm(false);

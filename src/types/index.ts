@@ -2,6 +2,10 @@
 // Type definitions cho Silence Production
 // ============================
 
+/** Trạng thái đồng bộ Firebase Cloud */
+export type FirebaseSyncStatus = 'disabled' | 'connecting' | 'connected' | 'syncing' | 'error';
+
+
 export interface Product {
   sku: string;
   name: string;
@@ -145,7 +149,7 @@ export interface AppContextType {
 
   // Data Management
   exportAllData: () => string;
-  importAllData: (json: string) => { success: boolean; error?: string };
+  importAllData: (json: string) => Promise<{ success: boolean; error?: string }>;
   clearData: () => void;
 
   // User Management
@@ -162,6 +166,12 @@ export interface AppContextType {
   actionLogs: ActionLog[];
   addActionLog: (action: string, details: string, category: ActionLogCategory) => void;
   clearActionLogs: () => void;
+
+  // Firebase Cloud Sync
+  /** Trạng thái đồng bộ Firebase: disabled | connecting | connected | syncing | error */
+  firebaseSyncStatus: FirebaseSyncStatus;
+  /** Đẩy toàn bộ dữ liệu local lên Firebase (dùng cho lần đầu hoặc force sync) */
+  pushAllDataToCloud: () => Promise<boolean>;
 }
 
 export type ActionLogCategory = 'auth' | 'product' | 'production' | 'sale' | 'expense' | 'system' | 'user_management' | 'sync';

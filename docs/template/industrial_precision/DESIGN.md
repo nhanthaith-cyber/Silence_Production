@@ -174,3 +174,9 @@ Larger containers like modals may use 8px (0.5rem) to distinguish them from stan
 - **Status Chips:** Small, low-saturation backgrounds with high-saturation text. For example, "Completed" uses a light mint background with Sage Green text.
 - **Inventory Cards:** Use a thumbnail image of the garment on the left, with SKU, Stock Level, and Status aligned in a rigid grid on the right.
 - **Progress Trackers:** Linear, thin 4px bars used to show manufacturing stages (Cutting, Sewing, Finishing, QC). Use Sage Green for completed steps and Slate for pending.
+- **Cloud Sync Status:** High-visibility status indicator in the Sidebar footer. Uses a small pulsing status dot:
+  - Connected: Sage Green (`#34d399`)
+  - Syncing/Connecting: Amber (`#fbbf24`)
+  - Error: Light Red (`#f87171`)
+  - Disabled: Muted Slate (`#6b7280`)
+   accompanied by matching Lucide icons (`Cloud` / `CloudOff`).

@@ -1,7 +1,7 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import type {
   Product, ProductionBatch, ProductionBatchItem, ProductionStage, Sale, Expense,
-  ActualRevenue,
+  ActualRevenue, FirebaseSyncStatus,
   AppContextType, NhanhApiMode, ConnectionStatus, SyncLog, UserWithPassword,
   User, ActionLog, ActionLogCategory
 } from '../types';
@@ -10,6 +10,20 @@ import { getTodayISO, generateId } from '../utils/formatters';
 import { fetchNhanhStock, fetchNhanhOrders, updateNhanhStock, checkNhanhConnection } from '../services/nhanhService';
 import { mapNhanhOrderToSale, mergeProductData } from '../services/nhanhDataMapper';
 import { exportAllData as exportData, parseImportData } from '../services/productionDataService';
+import {
+  initSync,
+  pushToFirebase,
+  pushAllToFirebase,
+  listenFirebase,
+  cleanupSync,
+  onSyncStatusChange,
+  isLocalPushInProgress,
+  markLocalPushInProgress,
+  getSyncStatus,
+  type FirebaseDataPath,
+} from '../services/firebaseSyncService';
+import type { Unsubscribe } from 'firebase/database';
+import { isFirebaseConfigured } from '../services/firebaseConfig';
 
 // Export context để hook useApp có thể truy cập
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -78,6 +92,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [apiMode, setApiModeState] = useState<NhanhApiMode>('sandbox');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
+
+  // Firebase Cloud Sync State
+  const [firebaseSyncStatus, setFirebaseSyncStatus] = useState<FirebaseSyncStatus>('disabled');
+  /**
+   * Flag để tránh vòng lặp vô hạn: khi nhận dữ liệu từ Firebase listener,
+   * ta set state → nhưng KHÔNG muốn push ngược lên Firebase.
+   * Mỗi path có flag riêng, reset sau 1 giây.
+   */
+  const firebaseUpdateInProgress = useRef<Record<string, boolean>>({});
 
   // Load from LocalStorage or seed defaults
   useEffect(() => {
@@ -203,9 +226,149 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionStatus, apiMode]);
 
-  // Save changes helper
+  // ============================
+  // Firebase Realtime Sync — Lắng nghe thay đổi từ các thiết bị khác
+  // ============================
+
+  useEffect(() => {
+    // Khởi tạo Firebase sync
+    const firebaseReady = initSync();
+    if (!firebaseReady) {
+      setFirebaseSyncStatus('disabled');
+      return;
+    }
+
+    // Đăng ký listener trạng thái sync
+    const unsubStatus = onSyncStatusChange((status) => {
+      setFirebaseSyncStatus(status);
+    });
+
+    // Helper: đánh dấu path đang được cập nhật từ Firebase → tránh dual-write ngược
+    const markFirebaseUpdate = (path: string) => {
+      firebaseUpdateInProgress.current[path] = true;
+      setTimeout(() => {
+        firebaseUpdateInProgress.current[path] = false;
+      }, 1000);
+    };
+
+    // Setup listeners cho từng path dữ liệu
+    const unsubscribes: Array<Unsubscribe | null> = [];
+
+    // Listener: Products
+    unsubscribes.push(
+      listenFirebase<Product[]>('products', (data) => {
+        if (data && Array.isArray(data) && !isLocalPushInProgress('products')) {
+          markFirebaseUpdate('products');
+          setProducts(data);
+          localStorage.setItem('silence_prod_products', JSON.stringify(data));
+          console.log('[FirebaseSync] 📥 Products cập nhật từ cloud:', data.length, 'items');
+        }
+      })
+    );
+
+    // Listener: Production Batches
+    unsubscribes.push(
+      listenFirebase<ProductionBatch[]>('productionBatches', (data) => {
+        if (data && Array.isArray(data) && !isLocalPushInProgress('productionBatches')) {
+          markFirebaseUpdate('productionBatches');
+          const migrated = migrateBatches(data);
+          setProductionBatches(migrated);
+          localStorage.setItem('silence_prod_batches', JSON.stringify(migrated));
+          console.log('[FirebaseSync] 📥 Batches cập nhật từ cloud:', migrated.length, 'items');
+        }
+      })
+    );
+
+    // Listener: Sales
+    unsubscribes.push(
+      listenFirebase<Sale[]>('sales', (data) => {
+        if (data && Array.isArray(data) && !isLocalPushInProgress('sales')) {
+          markFirebaseUpdate('sales');
+          setSales(data);
+          localStorage.setItem('silence_prod_sales', JSON.stringify(data));
+          console.log('[FirebaseSync] 📥 Sales cập nhật từ cloud:', data.length, 'items');
+        }
+      })
+    );
+
+    // Listener: Expenses
+    unsubscribes.push(
+      listenFirebase<Expense[]>('expenses', (data) => {
+        if (data && Array.isArray(data) && !isLocalPushInProgress('expenses')) {
+          markFirebaseUpdate('expenses');
+          setExpenses(data);
+          localStorage.setItem('silence_prod_expenses', JSON.stringify(data));
+          console.log('[FirebaseSync] 📥 Expenses cập nhật từ cloud:', data.length, 'items');
+        }
+      })
+    );
+
+    // Listener: Actual Revenues
+    unsubscribes.push(
+      listenFirebase<ActualRevenue[]>('actualRevenues', (data) => {
+        if (data && Array.isArray(data) && !isLocalPushInProgress('actualRevenues')) {
+          markFirebaseUpdate('actualRevenues');
+          setActualRevenues(data);
+          localStorage.setItem('silence_actual_revenues', JSON.stringify(data));
+          console.log('[FirebaseSync] 📥 ActualRevenues cập nhật từ cloud:', data.length, 'items');
+        }
+      })
+    );
+
+    // Listener: Users
+    unsubscribes.push(
+      listenFirebase<UserWithPassword[]>('users', (data) => {
+        if (data && Array.isArray(data)) {
+          markFirebaseUpdate('users');
+          setUsers(data);
+          localStorage.setItem('silence_prod_users', JSON.stringify(data));
+          console.log('[FirebaseSync] 📥 Users cập nhật từ cloud:', data.length, 'items');
+        }
+      })
+    );
+
+    // Listener: Action Logs
+    unsubscribes.push(
+      listenFirebase<ActionLog[]>('actionLogs', (data) => {
+        if (data && Array.isArray(data)) {
+          markFirebaseUpdate('actionLogs');
+          setActionLogs(data);
+          localStorage.setItem('silence_action_logs', JSON.stringify(data));
+          console.log('[FirebaseSync] 📥 ActionLogs cập nhật từ cloud:', data.length, 'items');
+        }
+      })
+    );
+
+    // Cleanup khi unmount
+    return () => {
+      unsubStatus();
+      cleanupSync(unsubscribes);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ============================
+  // Save changes helper — dual write: LocalStorage + Firebase
+  // ============================
+
+  /** Map LocalStorage key → Firebase path */
+  const localKeyToFirebasePath: Record<string, FirebaseDataPath> = {
+    silence_prod_products: 'products',
+    silence_prod_batches: 'productionBatches',
+    silence_prod_sales: 'sales',
+    silence_prod_expenses: 'expenses',
+    silence_actual_revenues: 'actualRevenues',
+    silence_prod_users: 'users',
+    silence_action_logs: 'actionLogs',
+  };
+
   const saveToLocal = (key: string, data: unknown) => {
     localStorage.setItem(key, JSON.stringify(data));
+
+    // Dual-write: Cũng đẩy lên Firebase nếu đã kết nối
+    const fbPath = localKeyToFirebasePath[key];
+    if (fbPath && !firebaseUpdateInProgress.current[fbPath]) {
+      pushToFirebase(fbPath, data, user?.username || 'system');
+    }
   };
 
   const getLatestUser = (): { username: string; name: string } => {
@@ -669,7 +832,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return exportData(products, productionBatches, sales, expenses, actualRevenues);
   };
 
-  const importAllData = (json: string): { success: boolean; error?: string } => {
+  const importAllData = async (json: string): Promise<{ success: boolean; error?: string }> => {
     const result = parseImportData(json);
     if (!result.success || !result.data) {
       return { success: false, error: result.error };
@@ -677,23 +840,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { data } = result;
     const migratedBatches = migrateBatches(data.productionBatches);
+
+    // 1. Lưu trực tiếp vào LocalStorage trước để đề phòng trang bị reload giữa chừng
+    localStorage.setItem('silence_prod_products', JSON.stringify(data.products));
+    localStorage.setItem('silence_prod_batches', JSON.stringify(migratedBatches));
+    localStorage.setItem('silence_prod_sales', JSON.stringify(data.sales));
+    localStorage.setItem('silence_prod_expenses', JSON.stringify(data.expenses));
+
+    let arCount = actualRevenues.length;
+    if (data.actualRevenues !== undefined) {
+      localStorage.setItem('silence_actual_revenues', JSON.stringify(data.actualRevenues));
+      arCount = data.actualRevenues.length;
+    }
+
+    // 2. Nếu đã kết nối Firebase, thực hiện đẩy toàn bộ dữ liệu trực tiếp và chờ hoàn tất (await)
+    if (isFirebaseConfigured()) {
+      // Đánh dấu bỏ qua phản hồi (echo)
+      markLocalPushInProgress('products');
+      markLocalPushInProgress('productionBatches');
+      markLocalPushInProgress('sales');
+      markLocalPushInProgress('expenses');
+      markLocalPushInProgress('actualRevenues');
+
+      const pushSuccess = await pushAllToFirebase({
+        products: data.products,
+        productionBatches: migratedBatches,
+        sales: data.sales,
+        expenses: data.expenses,
+        actualRevenues: data.actualRevenues !== undefined ? data.actualRevenues : actualRevenues,
+        users,
+        actionLogs,
+      });
+
+      if (!pushSuccess) {
+        return { success: false, error: 'Đồng bộ đám mây thất bại. Vui lòng kiểm tra kết nối mạng hoặc phân quyền Firebase.' };
+      }
+    }
+
+    // 3. Cập nhật state trong React
     setProducts(data.products);
     setProductionBatches(migratedBatches);
     setSales(data.sales);
     setExpenses(data.expenses);
-
-    // Bảo toàn tiền thu thực tế nhập tay khi import Excel hoặc file backup cũ không có trường này
-    let arCount = actualRevenues.length;
     if (data.actualRevenues !== undefined) {
       setActualRevenues(data.actualRevenues);
-      saveToLocal('silence_actual_revenues', data.actualRevenues);
-      arCount = data.actualRevenues.length;
     }
-
-    saveToLocal('silence_prod_products', data.products);
-    saveToLocal('silence_prod_batches', migratedBatches);
-    saveToLocal('silence_prod_sales', data.sales);
-    saveToLocal('silence_prod_expenses', data.expenses);
 
     addSyncLog('Hệ thống', 'Import dữ liệu', 'success',
       `Đã import: ${data.products.length} sản phẩm, ${data.productionBatches.length} lô SX, ${data.sales.length} đơn hàng, ${data.expenses.length} chi phí, ${arCount} khoản thu.`);
@@ -804,6 +995,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createAndSaveActionLog('Xóa nhật ký', 'Đã xóa toàn bộ nhật ký thao tác trên hệ thống.', 'system');
   };
 
+  // ============================
+  // Firebase: Đẩy toàn bộ dữ liệu lên Cloud
+  // ============================
+
+  const pushAllDataToCloud = async (): Promise<boolean> => {
+    const result = await pushAllToFirebase({
+      products,
+      productionBatches,
+      sales,
+      expenses,
+      actualRevenues,
+      users,
+      actionLogs,
+    });
+
+    if (result) {
+      createAndSaveActionLog(
+        'Đẩy dữ liệu lên Cloud',
+        `Đã đẩy toàn bộ dữ liệu lên Firebase Cloud thành công: ${products.length} SP, ${productionBatches.length} Lô SX, ${sales.length} Đơn, ${expenses.length} Chi phí.`,
+        'sync'
+      );
+    }
+
+    return result;
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -844,6 +1061,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         actionLogs,
         addActionLog: createAndSaveActionLog,
         clearActionLogs,
+        firebaseSyncStatus,
+        pushAllDataToCloud,
       }}
     >
       {children}

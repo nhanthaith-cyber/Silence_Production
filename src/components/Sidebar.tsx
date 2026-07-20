@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  LayoutDashboard, Factory, Receipt, Boxes, Package, Sparkles, Settings, RotateCcw, LogOut, TrendingUp
+  LayoutDashboard, Factory, Receipt, Boxes, Package, Sparkles, Settings, RotateCcw, LogOut, TrendingUp, Cloud, CloudOff
 } from 'lucide-react';
 import type { User } from '../types';
+import { useApp } from '../hooks/useApp';
 
 interface SidebarProps {
   currentPage: string;
@@ -13,6 +14,27 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, onReset, user, onLogout }) => {
+  const { firebaseSyncStatus } = useApp();
+
+  const getSyncLabel = () => {
+    switch (firebaseSyncStatus) {
+      case 'connected': return 'Cloud đã kết nối';
+      case 'syncing': return 'Đang đồng bộ...';
+      case 'connecting': return 'Đang kết nối...';
+      case 'error': return 'Lỗi kết nối Cloud';
+      default: return 'Cloud chưa cài đặt';
+    }
+  };
+
+  const getSyncColor = () => {
+    switch (firebaseSyncStatus) {
+      case 'connected': return '#34d399';
+      case 'syncing': return '#fbbf24';
+      case 'connecting': return '#fbbf24';
+      case 'error': return '#f87171';
+      default: return '#6b7280';
+    }
+  };
   const menuItems = [
     { key: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { key: 'production', label: 'Sản xuất', icon: Factory },
@@ -96,6 +118,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
 
       {/* Footer */}
       <div style={styles.footer}>
+        {/* Cloud Sync Status */}
+        <div style={styles.syncStatus}>
+          {firebaseSyncStatus === 'disabled' ? (
+            <CloudOff size={13} style={{ color: getSyncColor() }} />
+          ) : (
+            <Cloud size={13} style={{ color: getSyncColor() }} />
+          )}
+          <span style={{ ...styles.syncLabel, color: getSyncColor() }}>
+            <span style={{ ...styles.syncDot, backgroundColor: getSyncColor() }} />
+            {getSyncLabel()}
+          </span>
+        </div>
+
         <button
           onClick={onReset}
           style={styles.resetBtn}
@@ -112,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, o
           <LogOut size={14} />
           <span>Đăng xuất</span>
         </button>
-        <div style={styles.version} className="mono">v2.0 — Production</div>
+        <div style={styles.version} className="mono">v2.1 — Cloud Sync</div>
       </div>
     </aside>
   );
@@ -273,5 +308,26 @@ const styles = {
     fontSize: '10px',
     color: '#3e5573',
     textAlign: 'center' as const,
+  },
+  syncStatus: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '6px 0',
+    marginBottom: '4px',
+  },
+  syncDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    display: 'inline-block',
+    marginRight: '4px',
+    animation: 'pulse 2s infinite',
+  } as React.CSSProperties,
+  syncLabel: {
+    fontSize: '11px',
+    fontWeight: 500,
+    display: 'flex',
+    alignItems: 'center',
   },
 };

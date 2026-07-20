@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
 import {
   Wifi, WifiOff, Shield, Download, Upload, Trash2, CheckCircle, AlertCircle,
-  RefreshCw, Clock, ExternalLink, Link, Loader, FileSpreadsheet, FileDown, FileUp
+  RefreshCw, Clock, ExternalLink, Link, Loader, FileSpreadsheet, FileDown, FileUp, Cloud
 } from 'lucide-react';
 import { exportToExcel, importFromExcel, generateExcelTemplate } from '../services/excelDataService';
 import type { ExcelImportResult, ExcelImportMode } from '../types';
@@ -13,7 +13,8 @@ export const Settings: React.FC = () => {
     checkConnection, setApiMode, exportAllData, importAllData, clearData,
     products, productionBatches, sales, expenses,
     users, addUser, deleteUser,
-    user, actionLogs, clearActionLogs
+    user, actionLogs, clearActionLogs,
+    firebaseSyncStatus, pushAllDataToCloud
   } = useApp();
 
   // Form state cho API credentials
@@ -27,6 +28,30 @@ export const Settings: React.FC = () => {
   const [importResult, setImportResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [oauthStatus, setOauthStatus] = useState<{ type: 'info' | 'success' | 'error'; msg: string } | null>(null);
   const [isExchanging, setIsExchanging] = useState(false);
+
+  // Firebase Cloud Sync State
+  const [isPushingCloud, setIsPushingCloud] = useState(false);
+  const [cloudPushResult, setCloudPushResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const handlePushToCloud = async () => {
+    if (!confirm('Bạn có chắc chắn muốn đẩy TOÀN BỘ dữ liệu hiện tại ở máy này lên Firebase Cloud? Việc này sẽ ghi đè dữ liệu cũ trên Cloud.')) {
+      return;
+    }
+    setIsPushingCloud(true);
+    setCloudPushResult(null);
+    try {
+      const success = await pushAllDataToCloud();
+      if (success) {
+        setCloudPushResult({ ok: true, msg: 'Đẩy dữ liệu lên Cloud thành công! Tất cả các thiết bị khác sẽ tự động nhận dữ liệu mới.' });
+      } else {
+        setCloudPushResult({ ok: false, msg: 'Lỗi đồng bộ: Firebase chưa kết nối hoặc cấu hình sai. Vui lòng kiểm tra lại.' });
+      }
+    } catch (e) {
+      setCloudPushResult({ ok: false, msg: `Lỗi kết nối: ${(e as Error).message}` });
+    } finally {
+      setIsPushingCloud(false);
+    }
+  };
 
   // Excel import state
   const [excelPreview, setExcelPreview] = useState<ExcelImportResult | null>(null);
@@ -328,7 +353,7 @@ export const Settings: React.FC = () => {
           : `Lỗi: ${result.error}`,
       });
       if (result.success) {
-        setTimeout(() => window.location.reload(), 1500);
+        setTimeout(() => window.location.reload(), 3000);
       }
     };
     reader.readAsText(file);
@@ -365,7 +390,7 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleConfirmExcelImport = () => {
+  const handleConfirmExcelImport = async () => {
     if (!excelPreview) return;
     const jsonStr = JSON.stringify({
       version: '1.0',
@@ -375,13 +400,13 @@ export const Settings: React.FC = () => {
       sales: excelImportMode === 'overwrite' ? excelPreview.sales : [...sales, ...excelPreview.sales.filter(s => !sales.find(es => es.id === s.id))],
       expenses: excelImportMode === 'overwrite' ? excelPreview.expenses : [...expenses, ...excelPreview.expenses.filter(ex => !expenses.find(ee => ee.id === ex.id))],
     });
-    const result = importAllData(jsonStr);
+    const result = await importAllData(jsonStr);
     if (result.success) {
       const mode = excelImportMode === 'overwrite' ? 'Ghi đè' : 'Thêm mới';
       setExcelSuccess(`✅ [${mode}] Import thành công: ${excelPreview.products.length} sản phẩm, ${excelPreview.sales.length} đơn hàng, ${excelPreview.expenses.length} chi phí, ${excelPreview.productionBatches.length} lô SX.`);
       setShowExcelConfirm(false);
       setExcelPreview(null);
-      setTimeout(() => window.location.reload(), 2000);
+      setTimeout(() => window.location.reload(), 3000);
     } else {
       setExcelError(`Lỗi import: ${result.error}`);
       setShowExcelConfirm(false);
@@ -774,6 +799,85 @@ export const Settings: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* ── Firebase Cloud Sync Section ── */}
+              <div style={{ height: '1px', background: '#e8edf4', margin: '4px 0' }} />
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#8191a9', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Cloud size={13} style={{ color: firebaseSyncStatus === 'connected' ? '#006c49' : '#8191a9' }} />
+                Đồng bộ đám mây (Firebase)
+              </div>
+
+              <div style={{
+                padding: '12px',
+                borderRadius: '6px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#475569', fontWeight: 500 }}>Trạng thái kết nối Cloud:</span>
+                  <span style={{
+                    fontWeight: 600,
+                    color: firebaseSyncStatus === 'connected' ? '#006c49' :
+                           firebaseSyncStatus === 'syncing' ? '#d97706' :
+                           firebaseSyncStatus === 'connecting' ? '#d97706' :
+                           firebaseSyncStatus === 'error' ? '#ba1a1a' : '#64748b'
+                  }}>
+                    {firebaseSyncStatus === 'connected' ? '🟢 Đang hoạt động (Connected)' :
+                     firebaseSyncStatus === 'syncing' ? '🟡 Đang gửi dữ liệu...' :
+                     firebaseSyncStatus === 'connecting' ? '🟡 Đang kết nối...' :
+                     firebaseSyncStatus === 'error' ? '🔴 Lỗi kết nối' : '⚫ Chưa cấu hình'}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 6px', lineHeight: '1.4' }}>
+                  Nếu đây là thiết bị có dữ liệu gốc (máy chủ chứa sản phẩm, lô sản xuất, đơn hàng thực tế), hãy ấn nút bên dưới để đẩy dữ liệu lên Cloud lần đầu. Điện thoại hoặc máy tính khác sau đó sẽ tự động lấy dữ liệu này về.
+                </p>
+
+                <button
+                  onClick={handlePushToCloud}
+                  className="btn btn-primary"
+                  disabled={isPushingCloud || firebaseSyncStatus === 'disabled'}
+                  style={{
+                    width: '100%',
+                    gap: '8px',
+                    backgroundColor: firebaseSyncStatus === 'connected' ? '#006c49' : '#cbd5e1',
+                    borderColor: firebaseSyncStatus === 'connected' ? '#006c49' : '#cbd5e1',
+                    cursor: firebaseSyncStatus === 'connected' ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  {isPushingCloud ? (
+                    <>
+                      <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Đang đồng bộ lên Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={14} />
+                      <span>Đẩy dữ liệu máy này lên Cloud</span>
+                    </>
+                  )}
+                </button>
+
+                {cloudPushResult && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '6px',
+                    alignItems: 'center',
+                    fontSize: '11px',
+                    padding: '6px 8px',
+                    borderRadius: '4px',
+                    background: cloudPushResult.ok ? '#ecfdf5' : '#fef2f2',
+                    color: cloudPushResult.ok ? '#065f46' : '#991b1b',
+                    border: `1px solid ${cloudPushResult.ok ? '#a7f3d0' : '#fca5a5'}`
+                  }}>
+                    {cloudPushResult.ok ? <CheckCircle size={12} /> : <AlertCircle size={12} />}
+                    <span>{cloudPushResult.msg}</span>
+                  </div>
+                )}
+              </div>
 
               <div style={styles.dangerZone}>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: '#ba1a1a' }}>Vùng nguy hiểm</div>

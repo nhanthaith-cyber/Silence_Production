@@ -6,20 +6,24 @@ Tai lieu nay mo ta chi tiet kien truc client-side, cach quan ly du lieu (state) 
 
 ## Tong quan Kien truc (Vite + React SPA)
 
-Ung dung duoc xay dung duoi dang Single Page Application (SPA) chay hoan toan tren trinh duyet cua nguoi dung. De phuc vu viec thu nghiem nhanh va luu tru ben vung, chung ta ket hop **React Context API** va **HTML5 LocalStorage**.
+Ung dung duoc xay dung duoi dang Single Page Application (SPA) chay hoan toan tren trinh duyet cua nguoi dung. Ket hop **React Context API**, **HTML5 LocalStorage** va **Firebase Realtime Database** de dong bo du lieu giua cac thiet bi.
 
 ```mermaid
 graph TD
     UI[React Components / Pages] -->|Actions: addProduct, advanceStage, syncSales, importExcel| State[React Context: AppState]
     State -->|Trang thai React thay doi| UI
-    State -->|Dong bo tu dong| LS[(Browser LocalStorage)]
+    State -->|Dual-write| LS[(Browser LocalStorage)]
+    State -->|Dual-write| Firebase[(Firebase Realtime DB)]
     LS -->|Khoi tao luc load trang| State
+    Firebase -->|onValue realtime listener| State
     Excel[File .xlsx nguoi dung upload] -->|importFromExcel| ExcelSvc[excelDataService.ts]
     ExcelSvc -->|ExcelImportResult preview| UI
     UI -->|Xac nhan import| State
     State -->|exportToExcel| Excel2[File .xlsx tai xuong]
     Nhanh[Nhanh.vn API v3.0] -->|syncSalesFromNhanh| State
     State -->|syncStockToNhanh| Nhanh
+    MachineB[Thiet bi khac] -->|write| Firebase
+    Firebase -->|realtime sync| MachineB
 ```
 
 ---
@@ -37,6 +41,8 @@ src/
 |   +-- nhanhDataMapper.ts        # Map du lieu Nhanh.vn -> kieu noi bo
 |   +-- excelDataService.ts       # [MOI] Doc/ghi file Excel (.xlsx) qua SheetJS
 |   +-- productionDataService.ts  # KPI san xuat, export/import JSON
+|   +-- firebaseConfig.ts         # [MOI] Khoi tao Firebase App + Realtime Database
+|   +-- firebaseSyncService.ts    # [MOI] Push/listen/debounce dong bo Cloud
 +-- components/
 |   +-- Sidebar.tsx               # Thanh dieu huong trai (240px)
 |   +-- Header.tsx                # Tieu de trang, nut Sync trang thai
@@ -73,7 +79,7 @@ Toan bo du lieu cua he thong duoc quan ly thong qua `AppContext` chua cac tap du
 
 ---
 
-## Luong cap nhat du lieu qua Excel
+## Luan cap nhat du lieu qua Excel
 
 Tinh nang nay cho phep cap nhat du lieu **offline** ma khong can ket noi Nhanh.vn API.
 
@@ -96,11 +102,90 @@ Tinh nang nay cho phep cap nhat du lieu **offline** ma khong can ket noi Nhanh.v
 6. Chọn chế độ cập nhật: Ghi đè (Overwrite) hoặc Thêm mới (Append)
       |
       v
-7. Xác nhận -> gọi `importAllData()` cập nhật LocalStorage -> Trình duyệt tự tải lại dữ liệu mới
+7. Xác nhận -> gọi `importAllData()`:
+      - setProducts/setSales/... cập nhật React state
+      - saveToLocal() ghi vào LocalStorage
+      - pushToFirebase() [debounce 500ms] đẩy lên Firebase cloud
+            |
+            | ** QUAN TRỌNG: pushToFirebase() đánh dấu localPushInProgress[path] = true
+            | ** Firebase listener sẽ BỎ QUA echo trong 3 giây tiếp theo
+            | ** để tránh race condition ghi đè dữ liệu mới
+            v
+8. Sau 3000ms: window.location.reload() để refresh UI
+      (3000ms = 500ms debounce + ~2000ms buffer cho network latency)
 ```
+
+> [!IMPORTANT]
+> **Tại sao timeout reload phải là 3000ms (không được giảm xuống)?**
+> Firebase `pushToFirebase()` có debounce 500ms trước khi push. Nếu reload xảy ra trước khi Firebase push hoàn tất, sau khi reload Firebase listener sẽ nhận lại data cũ từ cloud và ghi đè LocalStorage → mất dữ liệu mới vừa import.
 
 **Tach biet voi Nhanh.vn:** `excelDataService.ts` hoan toan doc lap voi `nhanhService.ts`.
 Khi co ket noi Nhanh.vn tro lai, chi can goi lai cac ham sync ma khong xung dot du lieu.
+
+---
+
+## Co che dong bo Firebase (Firebase Sync Architecture)
+
+Firebase Realtime Database duoc su dung de dong bo du lieu giua cac thiet bi theo thoi gian thuc.
+
+### Dual-write Pattern
+
+Moi thay doi du lieu tren local deu duoc ghi vai hai noi song song:
+
+```
+User Action
+    |
+    v
+setXxx(newData)          ← Cập nhật React state ngay lập tức
+    |
+    v
+saveToLocal(key, data)
+    ├── localStorage.setItem(key, JSON.stringify(data))
+    └── pushToFirebase(path, data)   ← debounce 500ms, sau đó push lên cloud
+```
+
+### Echo Suppression — Tranh vong lap ghi de
+
+Firebase `onValue` listener fire **ngay ca khi chinh client do vua push data**. De tranh listener nhan "echo" va ghi de du lieu moi bang du lieu cu tu cloud, he thong su dung co che **Local Push Suppression**:
+
+```
+pushToFirebase(path, data) duoc goi
+    |
+    ├── localPushInProgress[path] = true   ← Danh dau dang push
+    |   (tu dong reset ve false sau 3000ms)
+    |
+    └── [debounce 500ms] → push len Firebase cloud
+            |
+            v
+Firebase onValue listener nhan event
+    |
+    ├── if isLocalPushInProgress(path) === true
+    |       └── BỎ QUA (skip) — day la echo tu chinh minh
+    |
+    └── if isLocalPushInProgress(path) === false
+            └── Cap nhat state tu thiet bi KHAC — xu ly binh thuong
+```
+
+**Cac file lien quan:**
+- `firebaseSyncService.ts`: `localPushInProgress`, `isLocalPushInProgress()`, `pushToFirebase()`
+- `AppContext.tsx`: Kiem tra `!isLocalPushInProgress(path)` truoc khi xu ly Firebase listener callback
+
+### Chu ki song cua du lieu (Data Lifecycle)
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser A)
+    participant LS as LocalStorage
+    participant FB as Firebase Cloud
+    participant B as Browser B (khác)
+
+    U->>LS: saveToLocal(key, newData)
+    U->>FB: pushToFirebase(path, newData) [debounce 500ms]
+    Note over U: localPushInProgress[path] = true (3s)
+    FB-->>U: onValue echo (bị bỏ qua vì flag=true)
+    FB-->>B: onValue trigger
+    B->>B: setXxx(newData) + localStorage.setItem
+```
 
 ---
 
@@ -114,6 +199,35 @@ Khi co ket noi Nhanh.vn tro lai, chi can goi lai cac ham sync ma khong xung dot 
 | `Expense` | Chi phi: id, category, amount, expenseDate, notes |
 | `ExcelImportResult` | [MOI] Ket qua parse Excel: products[], sales[], expenses[], batches[], warnings[] |
 | `ExcelImportMode` | [MOI] Che do import: overwrite hoac append |
+
+---
+
+## Luu y & Cac bug da biet (Known Gotchas)
+
+Ghi nhan cac van de da gap de tranh lap lai trong tuong lai.
+
+### ❌ Bug: Import Excel khong ghi nhan du lieu moi
+
+**Ngay phat hien:** 2026-07-19
+
+**Trieu chung:** Sau khi import Excel thanh cong (hien thi thong bao "✅ Import thanh cong"), khi trang tai lai thi du lieu cu van hien thi, du lieu moi bi mat.
+
+**Nguyen nhan goc re (Root Cause):** Race condition giua Firebase listener va qua trinh push sau import:
+
+1. `importAllData()` ghi du lieu moi vao `localStorage` ✅
+2. `pushToFirebase()` debounce 500ms roi push len Firebase
+3. **Firebase `onValue` listener nhan "echo"** (hoac data cu tu cloud chua cap nhat kip) va ghi de lai `localStorage` bang du lieu cu ❌
+4. `window.location.reload()` xay ra sau 1500ms → app doc `localStorage` da bi ghi de → mat du lieu moi
+
+**Cach sua:**
+1. **`firebaseSyncService.ts`**: Them `localPushInProgress` flag. `pushToFirebase()` set `localPushInProgress[path] = true` ngay lap tuc, tu dong reset sau 3000ms.
+2. **`AppContext.tsx`**: Them check `!isLocalPushInProgress(path)` trong moi Firebase listener callback. Neu dang push tu local thi bo qua echo.
+3. **Tat ca cac page co import**: Tang timeout `window.location.reload()` tu 1500ms len **3000ms** de Firebase push hoan tat truoc khi reload.
+
+> [!CAUTION]
+> **Quy tac bat buoc cho tuong lai:** Bat ky tinh nang nao ghi du lieu va sau do `window.location.reload()` phai dam bao:
+> - Timeout reload >= **3000ms** neu co Firebase sync duoc bat
+> - Moi Firebase listener callback phai kiem tra `!isLocalPushInProgress(path)` truoc khi ghi de state
 
 ---
 

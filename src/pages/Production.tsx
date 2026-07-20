@@ -505,7 +505,7 @@ export const Production: React.FC = () => {
     }
   };
 
-  const handleConfirmExcelImport = () => {
+  const handleConfirmExcelImport = async () => {
     if (!excelPreview) return;
     const finalBatches = excelImportMode === 'overwrite'
       ? excelPreview.productionBatches
@@ -520,13 +520,13 @@ export const Production: React.FC = () => {
       products, productionBatches: finalBatches, sales, expenses,
     });
 
-    const result = importAllData(jsonStr);
+    const result = await importAllData(jsonStr);
     if (result.success) {
       const mode = excelImportMode === 'overwrite' ? 'Ghi đè' : 'Thêm mới';
       setExcelSuccess(`✅ [${mode}] Import lô sản xuất thành công: ${excelPreview.productionBatches.length} lô.`);
       setShowExcelConfirm(false);
       setExcelPreview(null);
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => window.location.reload(), 3000);
     } else {
       setExcelError(`Lỗi import: ${result.error}`);
       setShowExcelConfirm(false);

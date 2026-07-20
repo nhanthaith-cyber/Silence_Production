@@ -8,7 +8,7 @@ Tệp này cung cấp thông tin ngữ cảnh, quy tắc và chỉ dẫn cốt l
 
 - **Tên dự án:** Silence Production
 - **Mục tiêu:** Hệ thống quản lý sản xuất cho bên đi gia công, đồng bộ một số thứ qua nhanh.vn.
-- **Stack công nghệ chính:** React (TypeScript), Vite, LocalStorage.
+- **Stack công nghệ chính:** React (TypeScript), Vite, LocalStorage, Firebase Realtime Database.
 
 ---
 

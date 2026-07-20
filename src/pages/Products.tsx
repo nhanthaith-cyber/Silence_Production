@@ -48,7 +48,7 @@ export const Products: React.FC = () => {
     }
   };
 
-  const handleConfirmExcelImport = () => {
+  const handleConfirmExcelImport = async () => {
     if (!excelPreview) return;
     
     let finalProducts: typeof products = [];
@@ -96,14 +96,14 @@ export const Products: React.FC = () => {
       expenses,
     });
 
-    const result = importAllData(jsonStr);
+    const result = await importAllData(jsonStr);
     if (result.success) {
       const mode = excelImportMode === 'overwrite' ? 'Ghi đè' : 'Thêm mới';
       const qtyMsg = apiMode === 'sandbox' ? ' và số lượng tồn kho' : '';
       setExcelSuccess(`✅ [${mode}] Import sản phẩm${qtyMsg} thành công: ${excelPreview.products.length} sản phẩm.`);
       setShowExcelConfirm(false);
       setExcelPreview(null);
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => window.location.reload(), 3000);
     } else {
       setExcelError(`Lỗi import: ${result.error}`);
       setShowExcelConfirm(false);

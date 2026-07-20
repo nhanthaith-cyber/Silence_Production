@@ -39,7 +39,7 @@ export const Inventory: React.FC = () => {
     }
   };
 
-  const handleConfirmExcelImport = () => {
+  const handleConfirmExcelImport = async () => {
     if (!excelPreview) return;
     
     // Update nhanhStock of products
@@ -63,12 +63,12 @@ export const Inventory: React.FC = () => {
       expenses,
     });
 
-    const result = importAllData(jsonStr);
+    const result = await importAllData(jsonStr);
     if (result.success) {
       setExcelSuccess(`✅ Cập nhật tồn kho thành công cho ${excelPreview.products.length} SKU.`);
       setShowExcelConfirm(false);
       setExcelPreview(null);
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => window.location.reload(), 3000);
     } else {
       setExcelError(`Lỗi import: ${result.error}`);
       setShowExcelConfirm(false);

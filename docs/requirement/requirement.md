@@ -86,7 +86,13 @@ Tài liệu này xác định chi tiết các yêu cầu chức năng và phi ch
   - **Quy tắc Sandbox:** Trong chế độ Sandbox, khi import danh sách Sản phẩm, hệ thống sẽ tự động cập nhật số lượng tồn kho khả dụng (`nhanhStock`) cho sản phẩm đó từ file Excel. Ở chế độ Live, giá trị này được bỏ qua và quản lý bởi API Nhanh.vn.
 - **Backup JSON:** Vẫn giữ nguyên tính năng tải xuống/restore toàn bộ dữ liệu dưới dạng JSON ở mục Cài đặt.
 
-
+#### 6c. Đồng bộ dữ liệu đám mây (Firebase Realtime Database Sync)
+- **Đồng bộ đa thiết bị Realtime:** Cho phép nhiều tài khoản hoặc người dùng đăng nhập trên các máy khác nhau (như máy tính xưởng, điện thoại quản lý) xem chính xác cùng một phiên bản dữ liệu cập nhật mới nhất.
+- **Kiến trúc lưu trữ kép (Dual-Write):** Tự động ghi song song dữ liệu thay đổi vào LocalStorage (cho tốc độ tải nhanh, chạy offline) và Firebase Realtime Database (đồng bộ cloud).
+- **Lắng nghe thay đổi tự động (Realtime Listeners):** Lắng nghe thay đổi dữ liệu trên cloud và tự động cập nhật lại giao diện người dùng mà không cần reload trang.
+- **Đẩy dữ liệu thủ công (Manual Push):** Nút khởi tạo trong Cài đặt giúp người dùng đẩy dữ liệu hiện tại làm gốc lên Cloud cho thiết bị khác tải về đồng bộ.
+- **Tự động phục hồi lỗi (Graceful Fallback):** Khi chưa cấu hình Firebase hoặc mất kết nối mạng, ứng dụng vẫn hoạt động bình thường bằng dữ liệu LocalStorage nội bộ.
+- **Chống lặp dữ liệu (Anti-Loop Ref):** Sử dụng cơ chế khóa tạm thời (lock ref flag) khi dữ liệu truyền từ Cloud về máy để tránh ghi đè ngược trở lại Cloud gây lặp vô hạn.
 
 ---
 

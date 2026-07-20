@@ -25,9 +25,27 @@ pnpm install
 npm run dev
 ```
 
-### 4. Xây dựng bản Production (Build)
+### 4. Cấu hình biến môi trường (Environment Variables)
+Để kích hoạt tính năng **Đồng bộ đám mây (Firebase Realtime Database)**, hãy mở file cục bộ [`.env.local`](file:///.env.local) ở thư mục gốc và điền thông số cấu hình Firebase của bạn:
+```env
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+VITE_FIREBASE_DATABASE_URL=your_database_url  # Vị trí Singapore (asia-southeast1) khuyến nghị
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+*(Nếu chưa cấu hình, ứng dụng sẽ tự động rơi vào chế độ ngoại tuyến - LocalStorage fallback).*
+
+### 5. Xây dựng bản Production (Build)
 ```bash
 npm run build
+```
+
+### 6. Đẩy bản build lên GitHub Pages (Deploy)
+```bash
+npm run deploy
 ```
 
 ---

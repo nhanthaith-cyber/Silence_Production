@@ -1,6 +1,10 @@
 # Thiết kế Cơ sở Dữ liệu - Silence Production Dashboard
 
-Hệ thống sử dụng cơ chế lưu trữ cục bộ **LocalStorage** của trình duyệt để lưu trữ các bảng dữ liệu dưới dạng JSON. Dưới đây là đặc tả cấu trúc của các bảng.
+Hệ thống sử dụng **kiến trúc lưu trữ kép (Dual-Write)**:
+- **LocalStorage** của trình duyệt — lưu cache cục bộ, khởi tạo nhanh khi load trang, hoạt động offline.
+- **Firebase Realtime Database** — lưu trữ đám mây, đồng bộ realtime giữa tất cả các thiết bị đang mở app.
+
+Khi dữ liệu thay đổi → ghi đồng thời vào cả LocalStorage và Firebase. Khi Firebase nhận thay đổi từ thiết bị khác → tự động cập nhật React state và LocalStorage trên thiết bị hiện tại.
 
 ---
 
@@ -122,4 +126,61 @@ Key lưu trữ: `silence_prod_expenses`
 | `amount` | `number` | Số tiền chi trả. | `500000` |
 | `expenseDate` | `string` | Ngày chi trả. | `"2026-06-17"` |
 | `notes` | `string` | Nội dung mô tả chi tiết. | `"Chi chạy quảng cáo Facebook tháng 6"` |
+
+### 5. Bảng `actual_revenues` (Tiền thu thực tế)
+Key lưu trữ LocalStorage: `silence_actual_revenues`
+Đường dẫn Firebase: `actualRevenues`
+
+| Tên trường | Kiểu dữ liệu | Mô tả | Ví dụ |
+| :--- | :--- | :--- | :--- |
+| `id` | `string` (PK) | Mã khoản thu tự động sinh. | `"REV-20260718-AF21"` |
+| `amount` | `number` | Số tiền thu được (VND). | `12500000` |
+| `source` | `string` | Nguồn tiền thu (`shopee`, `tiktok`, `offline`, `bank_transfer`, `cash`, `other`). | `"bank_transfer"` |
+| `receivedDate` | `string` | Ngày thực tế nhận được tiền. | `"2026-07-18"` |
+| `notes` | `string` | Ghi chú cụ thể. | `"Shopee đối soát đợt 1 tháng 7"` |
+
+### 6. Bảng `users` (Danh sách người dùng và tài khoản)
+Key lưu trữ LocalStorage: `silence_prod_users`
+Đường dẫn Firebase: `users`
+
+| Tên trường | Kiểu dữ liệu | Mô tả | Ví dụ |
+| :--- | :--- | :--- | :--- |
+| `username` | `string` (PK) | Tên đăng nhập (viết thường, không dấu). | `"admin"` |
+| `password` | `string` | Mật khẩu tài khoản (dạng mã hóa cơ bản/plain text). | `"123456"` |
+| `name` | `string` | Tên hiển thị của người dùng. | `"Thái Hồng"` |
+| `role` | `string` | Vai trò hệ thống (`admin`, `production`, `finance`, `warehouse`). | `"admin"` |
+| `allowedPages` | `array` | Danh sách các trang được phép truy cập. | `["dashboard", "production", "inventory"]` |
+
+### 7. Bảng `action_logs` (Nhật ký thao tác hệ thống)
+Key lưu trữ LocalStorage: `silence_action_logs`
+Đường dẫn Firebase: `actionLogs`
+
+| Tên trường | Kiểu dữ liệu | Mô tả | Ví dụ |
+| :--- | :--- | :--- | :--- |
+| `id` | `string` (PK) | Mã log tự động sinh. | `"LOG-20260718-HJK9"` |
+| `timestamp` | `string` | Thời gian ghi nhận thao tác (ISO format). | `"2026-07-18T13:10:00Z"` |
+| `username` | `string` | Tên tài khoản thực hiện. | `"admin"` |
+| `userDisplayName` | `string` | Tên hiển thị người dùng. | `"Thái Hồng"` |
+| `action` | `string` | Hành động thực hiện. | `"Đẩy dữ liệu lên Cloud"` |
+| `details` | `string` | Chi tiết thao tác. | `"Đã đẩy toàn bộ dữ liệu lên Firebase Cloud thành công."` |
+| `category` | `string` | Nhóm thao tác (`auth`, `product`, `production`, `sale`, `expense`, `system`, `user_management`, `sync`). | `"sync"` |
+
+---
+
+## ☁️ Ánh xạ lưu trữ Firebase Realtime Database
+
+Khi cấu hình Firebase Cloud Sync, toàn bộ các bảng trên được ánh xạ thành các node cấp một tương ứng dưới gốc của Realtime Database như sau:
+
+```json
+{
+  "products": [ ... ],
+  "productionBatches": [ ... ],
+  "sales": [ ... ],
+  "expenses": [ ... ],
+  "actualRevenues": [ ... ],
+  "users": [ ... ],
+  "actionLogs": [ ... ]
+}
+```
+
 

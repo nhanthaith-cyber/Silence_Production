@@ -317,7 +317,7 @@ export const Dashboard: React.FC = () => {
       setExcelSuccessMsg(`✅ [${mode}] Import thành công: ${excelPreview.revenues.length} khoản thu.`);
       setShowExcelConfirm(false);
       setExcelPreview(null);
-      setTimeout(() => window.location.reload(), 1500);
+      setTimeout(() => window.location.reload(), 3000);
     } catch (err) {
       setExcelError(`Lỗi lưu dữ liệu: ${(err as Error).message}`);
       setShowExcelConfirm(false);
