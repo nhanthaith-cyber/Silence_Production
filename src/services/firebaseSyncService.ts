@@ -140,6 +140,14 @@ export const markLocalPushInProgress = (path: FirebaseDataPath): void => {
   }, LOCAL_PUSH_SUPPRESS_MS);
 };
 
+/**
+ * Loại bỏ các trường undefined trong object trước khi ghi lên Firebase (vì Firebase không hỗ trợ undefined)
+ */
+const sanitizeForFirebase = <T>(data: T): T => {
+  if (data === undefined) return null as unknown as T;
+  return JSON.parse(JSON.stringify(data));
+};
+
 export const pushToFirebase = (path: FirebaseDataPath, data: unknown, deviceId?: string): void => {
   if (!db) return; // Firebase chưa config → bỏ qua
 
@@ -153,8 +161,9 @@ export const pushToFirebase = (path: FirebaseDataPath, data: unknown, deviceId?:
 
   debounceTimers[path] = setTimeout(async () => {
     try {
+      const sanitizedData = sanitizeForFirebase(data);
       const dataRef = ref(db!, `silence_production/${path}`);
-      await set(dataRef, data);
+      await set(dataRef, sanitizedData);
 
       // Cập nhật metadata
       const metaRef = ref(db!, 'silence_production/_meta');
@@ -164,7 +173,7 @@ export const pushToFirebase = (path: FirebaseDataPath, data: unknown, deviceId?:
         lastUpdatedPath: path,
       });
 
-      console.log(`[FirebaseSync] ⬆️ Đã đẩy "${path}" lên Firebase (${Array.isArray(data) ? (data as unknown[]).length + ' items' : 'object'})`);
+      console.log(`[FirebaseSync] ⬆️ Đã đẩy "${path}" lên Firebase (${Array.isArray(sanitizedData) ? (sanitizedData as unknown[]).length + ' items' : 'object'})`);
     } catch (error) {
       console.error(`[FirebaseSync] ❌ Lỗi ghi "${path}":`, error);
       setStatus('error');
@@ -207,8 +216,9 @@ export const pushAllToFirebase = async (data: {
 
     await Promise.all(
       paths.map(async (path) => {
+        const sanitizedData = sanitizeForFirebase(data[path]);
         const dataRef = ref(db!, `silence_production/${path}`);
-        await set(dataRef, data[path]);
+        await set(dataRef, sanitizedData);
       })
     );
 
